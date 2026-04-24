@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Reports</h1>
+
+<div class="cards">
+    <div class="card"><span>Total Items</span><strong>{{ total_items }}</strong></div>
+    <div class="card"><span>Low Stock Items</span><strong>{{ low_stock_count }}</strong></div>
+    <div class="card"><span>Stock In Records</span><strong>{{ stock_in_count }}</strong></div>
+    <div class="card"><span>Stock Out Records</span><strong>{{ stock_out_count }}</strong></div>
+</div>
+
+<section class="panel">
+    <h2>Export Reports</h2>
+    <a href="{{ url_for('export_items') }}" class="btn-link">Download Items Excel</a>
+    <a href="{{ url_for('export_transactions') }}" class="btn-link">Download Transactions Excel</a>
+</section>
+{% endblock %}

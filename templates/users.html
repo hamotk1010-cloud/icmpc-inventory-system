@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>User Roles</h1>
+
+<section class="panel">
+    <h2>Add User Account</h2>
+
+    <form method="POST" class="form-grid">
+        <input name="full_name" placeholder="Full Name" required>
+        <input name="username" placeholder="Username" required>
+        <input name="password" placeholder="Password" required>
+
+        <select name="role" required>
+            <option value="admin">Admin</option>
+            <option value="staff">Staff</option>
+            <option value="branch_manager">Branch Manager</option>
+        </select>
+
+        <input name="branch" placeholder="Branch e.g. Head Office, Main Office, Poblacion Branch">
+        <button type="submit">Create User</button>
+    </form>
+</section>
+
+<section class="panel">
+    <h2>Accounts</h2>
+
+    <table>
+        <thead>
+            <tr><th>Name</th><th>Username</th><th>Role</th><th>Branch</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+        {% for u in users %}
+            <tr>
+                <td>{{ u.full_name }}</td>
+                <td>{{ u.username }}</td>
+                <td><span class="badge">{{ u.role|replace("_", " ")|title }}</span></td>
+                <td>{{ u.branch }}</td>
+                <td>
+                    {% if u.id != session.get("user_id") %}
+                    <a class="danger-link" href="{{ url_for('delete_user', user_id=u.id) }}" onclick="return confirm('Delete this user?')">Delete</a>
+                    {% else %}
+                    Current User
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5">No users found.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

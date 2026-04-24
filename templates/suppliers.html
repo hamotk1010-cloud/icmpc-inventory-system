@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Suppliers</h1>
+
+<section class="panel">
+    <h2>Add Supplier</h2>
+
+    <form method="POST" class="form-grid">
+        <input name="name" placeholder="Supplier Name" required>
+        <input name="email" type="email" placeholder="Email">
+        <input name="phone" placeholder="Phone">
+        <input name="tin" placeholder="TIN">
+
+        <select name="vat_type">
+            <option value="VAT">VAT</option>
+            <option value="Non-VAT">Non-VAT</option>
+        </select>
+
+        <select name="business_type">
+            <option value="Corporation">Corporation</option>
+            <option value="Sole Proprietorship">Sole Proprietorship</option>
+        </select>
+
+        <textarea name="address" placeholder="Address"></textarea>
+        <button type="submit">Save Supplier</button>
+    </form>
+</section>
+
+<section class="panel">
+    <h2>Supplier List</h2>
+
+    <table>
+        <thead>
+            <tr><th>Name</th><th>Email</th><th>Phone</th><th>TIN</th><th>Type</th></tr>
+        </thead>
+        <tbody>
+        {% for s in suppliers %}
+            <tr>
+                <td>{{ s.name }}</td>
+                <td>{{ s.email }}</td>
+                <td>{{ s.phone }}</td>
+                <td>{{ s.tin }}</td>
+                <td>{{ s.vat_type }} / {{ s.business_type }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="5">No suppliers yet.</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

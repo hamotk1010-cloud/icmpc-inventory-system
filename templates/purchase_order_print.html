@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ po.po_number }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='print.css') }}">
+</head>
+<body>
+<div class="print-page">
+    <div class="print-actions">
+        <button onclick="window.print()">Print / Save PDF</button>
+    </div>
+
+    <header class="po-header">
+        <div class="logo-box">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" onerror="this.style.display='none'">
+        </div>
+        <div>
+            <h1>Iligan Cement Multi-Purpose Cooperative</h1>
+            <p>Purchase Order</p>
+        </div>
+    </header>
+
+    <div class="po-title">
+        <h2>PURCHASE ORDER</h2>
+        <strong>{{ po.po_number }}</strong>
+    </div>
+
+    <div class="info-grid">
+        <div>
+            <h3>Supplier</h3>
+            <p><strong>{{ po.supplier_name or 'N/A' }}</strong></p>
+            <p>{{ po.address or '' }}</p>
+            <p>TIN: {{ po.tin or '' }}</p>
+            <p>Phone: {{ po.phone or '' }}</p>
+            <p>Email: {{ po.email or '' }}</p>
+        </div>
+
+        <div>
+            <h3>PO Details</h3>
+            <p><strong>Date:</strong> {{ po.po_date }}</p>
+            <p><strong>Requested By:</strong> {{ po.requested_by or '' }}</p>
+            <p><strong>Status:</strong> {{ po.status }}</p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Item Description</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in po_items %}
+            <tr>
+                <td>{{ item.item_description }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.unit }}</td>
+                <td>{{ "%.2f"|format(item.unit_price or 0) }}</td>
+                <td>{{ "%.2f"|format(item.line_total or 0) }}</td>
+            </tr>
+            {% endfor %}
+
+            <tr class="grand-total">
+                <td colspan="4">Grand Total</td>
+                <td>{{ "%.2f"|format(grand_total) }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="notes">
+        <strong>Notes:</strong>
+        <p>{{ po.notes or '' }}</p>
+    </div>
+
+    <div class="signatures">
+        <div><span></span><p>Prepared By</p></div>
+        <div><span></span><p>Checked By</p></div>
+        <div><span></span><p>Approved By</p></div>
+    </div>
+</div>
+</body>
+</html>

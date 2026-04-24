@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Stock Out</h1>
+
+<section class="panel small-panel">
+    <form method="POST">
+        <label>Select Item</label>
+        <select name="item_id" required>
+            <option value="">Choose item</option>
+            {% for item in items %}
+            <option value="{{ item.id }}">{{ item.item_name }} — Available: {{ item.quantity }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Quantity to Release</label>
+        <input type="number" name="quantity" required>
+
+        <label>Remarks / Released To</label>
+        <input name="remarks" placeholder="Employee, branch, purpose, etc.">
+
+        <button type="submit">Release Stock</button>
+    </form>
+</section>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Stock In</h1>
+
+<section class="panel small-panel">
+    <form method="POST">
+        <label>Select Item</label>
+        <select name="item_id" required>
+            <option value="">Choose item</option>
+            {% for item in items %}
+            <option value="{{ item.id }}">{{ item.item_name }} — Current: {{ item.quantity }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Quantity to Add</label>
+        <input type="number" name="quantity" required>
+
+        <label>Remarks</label>
+        <input name="remarks" placeholder="Delivery, purchase, return, etc.">
+
+        <button type="submit">Add Stock</button>
+    </form>
+</section>
+{% endblock %}

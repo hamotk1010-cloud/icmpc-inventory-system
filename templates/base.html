@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ICMPC Inventory System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+{% if session.get("user_id") %}
+<div class="sidebar">
+    <div class="brand">
+        <div class="brand-logo">IC</div>
+        <div>
+            <h2>ICMPC</h2>
+            <p>Inventory System</p>
+        </div>
+    </div>
+
+    <a href="{{ url_for('dashboard') }}">Dashboard</a>
+    <a href="{{ url_for('items') }}">Items</a>
+    <a href="{{ url_for('suppliers') }}">Suppliers</a>
+    <a href="{{ url_for('stock_in') }}">Stock In</a>
+    <a href="{{ url_for('stock_out') }}">Stock Out</a>
+    <a href="{{ url_for('transactions') }}">Transactions</a>
+    <a href="{{ url_for('purchase_orders') }}">Purchase Orders</a>
+    <a href="{{ url_for('reports') }}">Reports</a>
+
+    {% if session.get("role") == "admin" %}
+    <a href="{{ url_for('users') }}">User Roles</a>
+    {% endif %}
+
+    <a href="{{ url_for('logout') }}" class="logout">Logout</a>
+</div>
+{% endif %}
+
+<main class="{% if session.get('user_id') %}main{% else %}login-main{% endif %}">
+    {% if session.get("user_id") %}
+    <div class="topbar">
+        <div>
+            <strong>{{ session.get("full_name") }}</strong>
+            <span>{{ session.get("role")|replace("_", " ")|title }} · {{ session.get("branch") }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+</body>
+</html>

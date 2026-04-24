@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Inventory Dashboard</h1>
+        <p>Monitor items, suppliers, purchase orders, and stock movement.</p>
+    </div>
+</div>
+
+<div class="cards">
+    <div class="card stat-blue"><span>Total Items</span><strong>{{ total_items }}</strong></div>
+    <div class="card stat-green"><span>Suppliers</span><strong>{{ total_suppliers }}</strong></div>
+    <div class="card stat-orange"><span>Purchase Orders</span><strong>{{ total_po }}</strong></div>
+    <div class="card stat-purple"><span>Transactions</span><strong>{{ total_transactions }}</strong></div>
+</div>
+
+<div class="chart-grid">
+    <section class="panel">
+        <h2>Items by Category</h2>
+        <canvas id="categoryChart"></canvas>
+    </section>
+
+    <section class="panel">
+        <h2>Top Stock Quantity</h2>
+        <canvas id="stockChart"></canvas>
+    </section>
+</div>
+
+<div class="grid">
+    <section class="panel">
+        <h2>Low Stock Items</h2>
+        <table>
+            <thead>
+                <tr><th>Item</th><th>Qty</th><th>Limit</th><th>Supplier</th></tr>
+            </thead>
+            <tbody>
+            {% for item in low_stock %}
+                <tr>
+                    <td>{{ item.item_name }}</td>
+                    <td><span class="badge danger">{{ item.quantity }}</span></td>
+                    <td>{{ item.low_stock_limit }}</td>
+                    <td>{{ item.supplier_name or "N/A" }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4">No low stock items.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel">
+        <h2>Recent Transactions</h2>
+        <table>
+            <thead>
+                <tr><th>Date</th><th>Item</th><th>Type</th><th>Qty</th></tr>
+            </thead>
+            <tbody>
+            {% for t in recent_transactions %}
+                <tr>
+                    <td>{{ t.date_created }}</td>
+                    <td>{{ t.item_name }}</td>
+                    <td>{{ t.transaction_type }}</td>
+                    <td>{{ t.quantity }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4">No transactions yet.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+</div>
+
+<script>
+const categoryLabels = {{ category_labels|tojson }};
+const categoryValues = {{ category_values|tojson }};
+const stockLabels = {{ stock_labels|tojson }};
+const stockValues = {{ stock_values|tojson }};
+
+new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+        labels: categoryLabels,
+        datasets: [{
+            data: categoryValues,
+            backgroundColor: ['#123b7a','#22c55e','#f97316','#7c3aed','#06b6d4','#ef4444','#64748b','#eab308']
+        }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+
+new Chart(document.getElementById('stockChart'), {
+    type: 'bar',
+    data: {
+        labels: stockLabels,
+        datasets: [{
+            label: 'Quantity',
+            data: stockValues,
+            backgroundColor: '#123b7a',
+            borderRadius: 8
+        }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+});
+</script>
+{% endblock %}
