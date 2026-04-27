@@ -1,0 +1,7 @@
+<!-- ADD THESE LINKS INSIDE YOUR SIDEBAR in templates/base.html -->
+
+<a href="{{ url_for('equipment_assignments') }}">Equipment Assignments</a>
+
+{% if session.get("role") == "admin" %}
+<a href="{{ url_for('audit_logs') }}">Audit Logs</a>
+{% endif %}

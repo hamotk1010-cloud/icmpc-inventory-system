@@ -1,3 +1,7 @@
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import os
 import sqlite3
@@ -212,6 +216,57 @@ def init_db():
             )
         """)
 
+    # Audit logs and equipment assignments
+    if using_postgres():
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id SERIAL PRIMARY KEY,
+                user_name TEXT,
+                action TEXT NOT NULL,
+                details TEXT,
+                date_created TEXT NOT NULL
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS equipment_assignments (
+                id SERIAL PRIMARY KEY,
+                employee_name TEXT NOT NULL,
+                position TEXT,
+                branch TEXT,
+                item_id INTEGER REFERENCES items(id),
+                quantity INTEGER NOT NULL DEFAULT 1,
+                remarks TEXT,
+                assigned_by TEXT,
+                date_assigned TEXT NOT NULL
+            )
+        """)
+    else:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_name TEXT,
+                action TEXT NOT NULL,
+                details TEXT,
+                date_created TEXT NOT NULL
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS equipment_assignments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_name TEXT NOT NULL,
+                position TEXT,
+                branch TEXT,
+                item_id INTEGER,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                remarks TEXT,
+                assigned_by TEXT,
+                date_assigned TEXT NOT NULL,
+                FOREIGN KEY (item_id) REFERENCES items(id)
+            )
+        """)
+
     cur.execute(q("SELECT id FROM users WHERE username = ?"), ("admin",))
     admin = cur.fetchone()
 
@@ -223,6 +278,9 @@ def init_db():
 
     conn.commit()
     conn.close()
+
+
+
 
 
 def logged_in():
@@ -256,6 +314,22 @@ def branch_where(alias="items"):
 
     return "", []
 
+def log_action(action, details=""):
+    try:
+        conn = get_db_connection()
+        execute(conn, """
+            INSERT INTO audit_logs (user_name, action, details, date_created)
+            VALUES (?, ?, ?, ?)
+        """, (
+            session.get("full_name", "System"),
+            action,
+            details,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("Audit log error:", e)
 
 @app.route("/")
 def index():
@@ -849,6 +923,203 @@ def export_transactions():
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+@app.route("/audit-logs")
+def audit_logs():
+    check = require_admin()
+    if check:
+        return check
+
+    conn = get_db_connection()
+    logs = fetchall(conn, """
+        SELECT *
+        FROM audit_logs
+        ORDER BY id DESC
+        LIMIT 300
+    """)
+    conn.close()
+
+    return render_template("audit_logs.html", logs=logs)
+
+
+@app.route("/equipment-assignments", methods=["GET", "POST"])
+def equipment_assignments():
+    check = require_login()
+    if check:
+        return check
+
+    conn = get_db_connection()
+
+    if request.method == "POST":
+        item_id = int(request.form.get("item_id"))
+        quantity = int(request.form.get("quantity") or 1)
+
+        item = fetchone(conn, "SELECT * FROM items WHERE id = ?", (item_id,))
+
+        if not item or item["quantity"] < quantity:
+            flash("Not enough stock available for assignment.", "danger")
+            conn.close()
+            return redirect(url_for("equipment_assignments"))
+
+        execute(conn, """
+            INSERT INTO equipment_assignments
+            (employee_name, position, branch, item_id, quantity, remarks, assigned_by, date_assigned)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            request.form.get("employee_name"),
+            request.form.get("position"),
+            request.form.get("branch"),
+            item_id,
+            quantity,
+            request.form.get("remarks"),
+            session.get("full_name"),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+
+        execute(conn, "UPDATE items SET quantity = quantity - ? WHERE id = ?", (quantity, item_id))
+
+        conn.commit()
+        conn.close()
+
+        log_action(
+            "Equipment Assigned",
+            f"{request.form.get('employee_name')} received item ID {item_id}, Qty {quantity}"
+        )
+
+        flash("Equipment assigned successfully.", "success")
+        return redirect(url_for("equipment_assignments"))
+
+    assignments = fetchall(conn, """
+        SELECT equipment_assignments.*, items.item_name, items.unit
+        FROM equipment_assignments
+        LEFT JOIN items ON items.id = equipment_assignments.item_id
+        ORDER BY equipment_assignments.id DESC
+    """)
+
+    items = fetchall(conn, "SELECT * FROM items ORDER BY item_name ASC")
+    conn.close()
+
+    return render_template("equipment_assignments.html", assignments=assignments, items=items)
+
+
+@app.route("/reports/pdf/items")
+def export_items_pdf():
+    check = require_login()
+    if check:
+        return check
+
+    conn = get_db_connection()
+    rows = fetchall(conn, """
+        SELECT items.item_name, items.category, items.unit, items.quantity,
+               items.low_stock_limit, items.branch, suppliers.name AS supplier_name
+        FROM items
+        LEFT JOIN suppliers ON suppliers.id = items.supplier_id
+        ORDER BY items.item_name ASC
+    """)
+    conn.close()
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph("Iligan Cement Multi-Purpose Cooperative", styles["Title"]))
+    elements.append(Paragraph("Inventory Items Report", styles["Heading2"]))
+    elements.append(Paragraph("Generated: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"), styles["Normal"]))
+    elements.append(Spacer(1, 12))
+
+    data = [["Item", "Category", "Unit", "Qty", "Limit", "Branch", "Supplier"]]
+
+    for r in rows:
+        data.append([
+            r["item_name"] or "",
+            r["category"] or "",
+            r["unit"] or "",
+            str(r["quantity"] or 0),
+            str(r["low_stock_limit"] or 0),
+            r["branch"] or "",
+            r["supplier_name"] or ""
+        ])
+
+    table = Table(data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123b7a")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+
+    elements.append(table)
+    doc.build(elements)
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="ICMPC_Inventory_Items_Report.pdf",
+        mimetype="application/pdf"
+    )
+
+
+@app.route("/reports/pdf/assignments")
+def export_assignments_pdf():
+    check = require_login()
+    if check:
+        return check
+
+    conn = get_db_connection()
+    rows = fetchall(conn, """
+        SELECT equipment_assignments.*, items.item_name
+        FROM equipment_assignments
+        LEFT JOIN items ON items.id = equipment_assignments.item_id
+        ORDER BY equipment_assignments.id DESC
+    """)
+    conn.close()
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph("Iligan Cement Multi-Purpose Cooperative", styles["Title"]))
+    elements.append(Paragraph("Equipment Assignment Report", styles["Heading2"]))
+    elements.append(Paragraph("Generated: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"), styles["Normal"]))
+    elements.append(Spacer(1, 12))
+
+    data = [["Date", "Employee", "Position", "Branch", "Item", "Qty", "Assigned By"]]
+
+    for r in rows:
+        data.append([
+            r["date_assigned"] or "",
+            r["employee_name"] or "",
+            r["position"] or "",
+            r["branch"] or "",
+            r["item_name"] or "",
+            str(r["quantity"] or 0),
+            r["assigned_by"] or ""
+        ])
+
+    table = Table(data, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123b7a")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+
+    elements.append(table)
+    doc.build(elements)
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="ICMPC_Equipment_Assignment_Report.pdf",
+        mimetype="application/pdf"
+    )
 
 @app.route("/health")
 def health():
