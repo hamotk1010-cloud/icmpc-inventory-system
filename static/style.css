@@ -430,3 +430,207 @@
         width: 40px;
     }
 }
+
+/* ================================
+   PROFESSIONAL PAGE UI UPGRADE
+   Applies to Items, Suppliers, Stock, PO, Reports, Users
+   ================================ */
+
+.main {
+    background: #f4f7fb;
+    min-height: 100vh;
+}
+
+h1 {
+    font-size: 28px;
+    color: #0f172a;
+    margin-bottom: 18px;
+    font-weight: 800;
+}
+
+h2 {
+    color: #123b7a;
+    font-size: 20px;
+    margin-bottom: 16px;
+}
+
+.panel,
+.form-box,
+.section {
+    background: #ffffff;
+    border-radius: 20px;
+    padding: 24px;
+    margin-bottom: 22px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    border: 1px solid #e5e7eb;
+}
+
+.panel-head,
+.page-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    padding: 13px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    background: #f8fafc;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+button,
+.btn-link,
+.btn-small {
+    background: #123b7a;
+    color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 16px;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+button:hover,
+.btn-link:hover,
+.btn-small:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: white;
+    overflow: hidden;
+    border-radius: 14px;
+}
+
+th {
+    background: #123b7a;
+    color: white;
+    padding: 14px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+td {
+    padding: 14px;
+    border-bottom: 1px solid #e5e7eb;
+    color: #334155;
+}
+
+tr:hover td {
+    background: #f8fafc;
+}
+
+.badge {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1e40af;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.alert {
+    border-radius: 14px;
+    padding: 14px 16px;
+    font-weight: 700;
+    margin-bottom: 16px;
+}
+
+.alert.success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.alert.danger {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Better sidebar menu */
+.sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-radius: 12px;
+    font-weight: 600;
+}
+
+.sidebar a:hover {
+    background: rgba(255,255,255,0.14);
+    padding-left: 18px;
+}
+
+/* Purchase order rows */
+.po-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+/* Mobile friendly */
+@media (max-width: 768px) {
+    .main {
+        padding: 14px;
+    }
+
+    .panel,
+    .form-box,
+    .section {
+        padding: 16px;
+        border-radius: 16px;
+    }
+
+    .form-grid,
+    .po-row,
+    .panel-head,
+    .page-head {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    table {
+        min-width: 760px;
+    }
+
+    .panel,
+    .section {
+        overflow-x: auto;
+    }
+
+    h1 {
+        font-size: 23px;
+    }
+}
