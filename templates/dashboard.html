@@ -1,80 +1,173 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="page-head">
-    <div>
-        <h1>Inventory Dashboard</h1>
-        <p>Monitor items, suppliers, purchase orders, and stock movement.</p>
+
+<div class="enterprise-dashboard">
+
+    <div class="enterprise-hero fade-in">
+        <div>
+            <h1>ICMPC Inventory Dashboard</h1>
+            <p>Real-time monitoring of inventory, stock movement, suppliers, and purchase orders.</p>
+        </div>
+
+        <div class="hero-actions">
+            <a href="{{ url_for('items') }}" class="hero-btn">
+                <i class="fa-solid fa-boxes-stacked"></i> Manage Items
+            </a>
+            <a href="{{ url_for('stock_in') }}" class="hero-btn light">
+                <i class="fa-solid fa-circle-plus"></i> Stock In
+            </a>
+        </div>
     </div>
+
+    {% if low_stock %}
+    <div class="low-stock-alert slide-down">
+        <div>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <strong>Low Stock Alert:</strong>
+            {{ low_stock|length }} item(s) need attention.
+        </div>
+        <a href="{{ url_for('items') }}">View Inventory</a>
+    </div>
+    {% endif %}
+
+    <div class="enterprise-cards">
+        <div class="enterprise-card card-blue fade-in">
+            <div class="card-icon"><i class="fa-solid fa-box"></i></div>
+            <div>
+                <span>Total Items</span>
+                <strong>{{ total_items }}</strong>
+                <small>All recorded inventory items</small>
+            </div>
+        </div>
+
+        <div class="enterprise-card card-green fade-in delay-1">
+            <div class="card-icon"><i class="fa-solid fa-truck-field"></i></div>
+            <div>
+                <span>Suppliers</span>
+                <strong>{{ total_suppliers }}</strong>
+                <small>Registered suppliers</small>
+            </div>
+        </div>
+
+        <div class="enterprise-card card-orange fade-in delay-2">
+            <div class="card-icon"><i class="fa-solid fa-file-invoice"></i></div>
+            <div>
+                <span>Purchase Orders</span>
+                <strong>{{ total_po }}</strong>
+                <small>Created purchase orders</small>
+            </div>
+        </div>
+
+        <div class="enterprise-card card-purple fade-in delay-3">
+            <div class="card-icon"><i class="fa-solid fa-right-left"></i></div>
+            <div>
+                <span>Transactions</span>
+                <strong>{{ total_transactions }}</strong>
+                <small>Stock in/out activities</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="enterprise-grid">
+        <section class="enterprise-panel fade-in">
+            <div class="panel-title">
+                <h2><i class="fa-solid fa-chart-pie"></i> Items by Category</h2>
+                <span>Category distribution</span>
+            </div>
+            <canvas id="categoryChart"></canvas>
+        </section>
+
+        <section class="enterprise-panel fade-in delay-1">
+            <div class="panel-title">
+                <h2><i class="fa-solid fa-chart-column"></i> Top Stock Levels</h2>
+                <span>Highest item quantities</span>
+            </div>
+            <canvas id="stockChart"></canvas>
+        </section>
+    </div>
+
+    <div class="enterprise-grid">
+        <section class="enterprise-panel fade-in">
+            <div class="panel-title">
+                <h2><i class="fa-solid fa-bell"></i> Low Stock Items</h2>
+                <span>Items below or equal to reorder level</span>
+            </div>
+
+            <div class="table-scroll">
+                <table class="enterprise-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Quantity</th>
+                            <th>Limit</th>
+                            <th>Supplier</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in low_stock %}
+                        <tr>
+                            <td>{{ item.item_name }}</td>
+                            <td><span class="status-pill danger">{{ item.quantity }}</span></td>
+                            <td>{{ item.low_stock_limit }}</td>
+                            <td>{{ item.supplier_name or "N/A" }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="4">No low stock items.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="enterprise-panel fade-in delay-1">
+            <div class="panel-title">
+                <h2><i class="fa-solid fa-clock-rotate-left"></i> Recent Transactions</h2>
+                <span>Latest stock movements</span>
+            </div>
+
+            <div class="table-scroll">
+                <table class="enterprise-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Item</th>
+                            <th>Type</th>
+                            <th>Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for t in recent_transactions %}
+                        <tr>
+                            <td>{{ t.date_created }}</td>
+                            <td>{{ t.item_name }}</td>
+                            <td>
+                                {% if t.transaction_type == "Stock In" %}
+                                <span class="status-pill success">{{ t.transaction_type }}</span>
+                                {% else %}
+                                <span class="status-pill warning">{{ t.transaction_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ t.quantity }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="4">No transactions yet.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
 </div>
 
-<div class="cards">
-    <div class="card stat-blue"><span>Total Items</span><strong>{{ total_items }}</strong></div>
-    <div class="card stat-green"><span>Suppliers</span><strong>{{ total_suppliers }}</strong></div>
-    <div class="card stat-orange"><span>Purchase Orders</span><strong>{{ total_po }}</strong></div>
-    <div class="card stat-purple"><span>Transactions</span><strong>{{ total_transactions }}</strong></div>
-</div>
-
-<div class="chart-grid">
-    <section class="panel">
-        <h2>Items by Category</h2>
-        <canvas id="categoryChart"></canvas>
-    </section>
-
-    <section class="panel">
-        <h2>Top Stock Quantity</h2>
-        <canvas id="stockChart"></canvas>
-    </section>
-</div>
-
-<div class="grid">
-    <section class="panel">
-        <h2>Low Stock Items</h2>
-        <table>
-            <thead>
-                <tr><th>Item</th><th>Qty</th><th>Limit</th><th>Supplier</th></tr>
-            </thead>
-            <tbody>
-            {% for item in low_stock %}
-                <tr>
-                    <td>{{ item.item_name }}</td>
-                    <td><span class="badge danger">{{ item.quantity }}</span></td>
-                    <td>{{ item.low_stock_limit }}</td>
-                    <td>{{ item.supplier_name or "N/A" }}</td>
-                </tr>
-            {% else %}
-                <tr><td colspan="4">No low stock items.</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </section>
-
-    <section class="panel">
-        <h2>Recent Transactions</h2>
-        <table>
-            <thead>
-                <tr><th>Date</th><th>Item</th><th>Type</th><th>Qty</th></tr>
-            </thead>
-            <tbody>
-            {% for t in recent_transactions %}
-                <tr>
-                    <td>{{ t.date_created }}</td>
-                    <td>{{ t.item_name }}</td>
-                    <td>{{ t.transaction_type }}</td>
-                    <td>{{ t.quantity }}</td>
-                </tr>
-            {% else %}
-                <tr><td colspan="4">No transactions yet.</td></tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </section>
-</div>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-const categoryLabels = {{ category_labels|tojson }};
-const categoryValues = {{ category_values|tojson }};
-const stockLabels = {{ stock_labels|tojson }};
-const stockValues = {{ stock_values|tojson }};
+const categoryLabels = {{ category_labels | tojson }};
+const categoryValues = {{ category_values | tojson }};
+const stockLabels = {{ stock_labels | tojson }};
+const stockValues = {{ stock_values | tojson }};
 
 new Chart(document.getElementById('categoryChart'), {
     type: 'doughnut',
@@ -82,10 +175,16 @@ new Chart(document.getElementById('categoryChart'), {
         labels: categoryLabels,
         datasets: [{
             data: categoryValues,
-            backgroundColor: ['#123b7a','#22c55e','#f97316','#7c3aed','#06b6d4','#ef4444','#64748b','#eab308']
+            backgroundColor: ['#123b7a', '#16a34a', '#f97316', '#7c3aed', '#0ea5e9', '#dc2626', '#64748b', '#eab308'],
+            borderWidth: 2,
+            borderColor: '#ffffff'
         }]
     },
-    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    options: {
+        responsive: true,
+        plugins: { legend: { position: 'bottom' } },
+        animation: { animateScale: true, animateRotate: true }
+    }
 });
 
 new Chart(document.getElementById('stockChart'), {
@@ -96,10 +195,20 @@ new Chart(document.getElementById('stockChart'), {
             label: 'Quantity',
             data: stockValues,
             backgroundColor: '#123b7a',
-            borderRadius: 8
+            borderRadius: 10
         }]
     },
-    options: { responsive: true, plugins: { legend: { display: false } } }
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } },
+        animation: { duration: 1200, easing: 'easeOutQuart' }
+    }
 });
+
+setTimeout(() => {
+    window.location.reload();
+}, 60000);
 </script>
+
 {% endblock %}
