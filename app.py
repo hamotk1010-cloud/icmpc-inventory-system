@@ -1,4 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+import os
+import psycopg2
 import sqlite3
 from datetime import datetime
 from io import BytesIO
@@ -9,10 +11,16 @@ app.secret_key = "icmpc-inventory-secret-key"
 DATABASE = "inventory.db"
 
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if DATABASE_URL:
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    else:
+        conn = sqlite3.connect(DATABASE)
+        conn.row_factory = sqlite3.Row
+        return conn
 
 
 def column_exists(cur, table, column):
