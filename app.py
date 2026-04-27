@@ -169,10 +169,19 @@ def login():
         password = request.form.get("password", "").strip()
 
         conn = get_db_connection()
-        user = conn.execute("""
-            SELECT * FROM users
-            WHERE username = ? AND password = ?
-        """, (username, password)).fetchone()
+
+    if DATABASE_URL:
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT * FROM users
+        WHERE username = %s AND password = %s
+    """, (username, password))
+    user = cur.fetchone()
+else:
+    user = conn.execute("""
+        SELECT * FROM users
+        WHERE username = ? AND password = ?
+    """, (username, password)).fetchone()
         conn.close()
 
         if user:
