@@ -5,32 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
 {% if session.get("user_id") %}
 <div class="sidebar">
-    <div class="brand">
-        <div class="brand-logo">IC</div>
-        <div>
-            <h2>ICMPC</h2>
-            <p>Inventory System</p>
-        </div>
+
+    <div class="sidebar-header">
+        <img src="{{ url_for('static', filename='images/logo.png') }}" class="sidebar-logo">
+        <h3>ICMPC</h3>
     </div>
 
-    <a href="{{ url_for('dashboard') }}">Dashboard</a>
-    <a href="{{ url_for('items') }}">Items</a>
-    <a href="{{ url_for('suppliers') }}">Suppliers</a>
-    <a href="{{ url_for('stock_in') }}">Stock In</a>
-    <a href="{{ url_for('stock_out') }}">Stock Out</a>
-    <a href="{{ url_for('transactions') }}">Transactions</a>
-    <a href="{{ url_for('purchase_orders') }}">Purchase Orders</a>
-    <a href="{{ url_for('reports') }}">Reports</a>
+    <a href="{{ url_for('dashboard') }}">
+        <i class="fa-solid fa-chart-line"></i> Dashboard
+    </a>
+
+    <a href="{{ url_for('items') }}">
+        <i class="fa-solid fa-box"></i> Items
+    </a>
+
+    <a href="{{ url_for('suppliers') }}">
+        <i class="fa-solid fa-truck"></i> Suppliers
+    </a>
+
+    <a href="{{ url_for('stock_in') }}">
+        <i class="fa-solid fa-circle-plus"></i> Stock In
+    </a>
+
+    <a href="{{ url_for('stock_out') }}">
+        <i class="fa-solid fa-circle-minus"></i> Stock Out
+    </a>
+
+    <a href="{{ url_for('transactions') }}">
+        <i class="fa-solid fa-right-left"></i> Transactions
+    </a>
+
+    <a href="{{ url_for('purchase_orders') }}">
+        <i class="fa-solid fa-file-invoice"></i> Purchase Orders
+    </a>
+
+    <a href="{{ url_for('reports') }}">
+        <i class="fa-solid fa-chart-pie"></i> Reports
+    </a>
 
     {% if session.get("role") == "admin" %}
-    <a href="{{ url_for('users') }}">User Roles</a>
+    <a href="{{ url_for('users') }}">
+        <i class="fa-solid fa-users"></i> User Roles
+    </a>
     {% endif %}
 
-    <a href="{{ url_for('logout') }}" class="logout">Logout</a>
+    <a href="{{ url_for('logout') }}" class="logout">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+    </a>
+
 </div>
 {% endif %}
 
