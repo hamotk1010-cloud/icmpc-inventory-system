@@ -170,7 +170,7 @@ def login():
 
         conn = get_db_connection()
 
-    if DATABASE_URL:
+if DATABASE_URL:
     cur = conn.cursor()
     cur.execute("""
         SELECT * FROM users
