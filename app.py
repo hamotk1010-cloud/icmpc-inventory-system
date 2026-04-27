@@ -267,14 +267,13 @@ def init_db():
             )
         """)
 
-    cur.execute(q("SELECT id FROM users WHERE username = ?"), ("admin",))
-    admin = cur.fetchone()
+    # ALWAYS ENSURE ADMIN EXISTS
+    cur.execute(q("DELETE FROM users WHERE username = ?"), ("admin",))
 
-    if not admin:
-        cur.execute(q("""
-            INSERT INTO users (full_name, username, password, role, branch)
-            VALUES (?, ?, ?, ?, ?)
-        """), ("Administrator", "admin", "admin123", "admin", "Head Office"))
+    cur.execute(q("""
+        INSERT INTO users (full_name, username, password, role, branch)
+        VALUES (?, ?, ?, ?, ?)
+    """), ("Administrator", "admin", "admin123", "admin", "Head Office"))
 
     conn.commit()
     conn.close()
