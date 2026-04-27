@@ -1,127 +1,225 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import os
-import psycopg2
 import sqlite3
 from datetime import datetime
 from io import BytesIO
 from openpyxl import Workbook
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if DATABASE_URL:
+    import psycopg2
+    import psycopg2.extras
+
 app = Flask(__name__)
-app.secret_key = "icmpc-inventory-secret-key"
+app.secret_key = os.environ.get("SECRET_KEY", "icmpc-inventory-secret-key")
 DATABASE = "inventory.db"
 
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
+def using_postgres():
+    return bool(DATABASE_URL)
+
 
 def get_db_connection():
-    if DATABASE_URL:
-        conn = psycopg2.connect(DATABASE_URL)
-        return conn
-    else:
-        conn = sqlite3.connect(DATABASE)
-        conn.row_factory = sqlite3.Row
-        return conn
+    if using_postgres():
+        return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
-def column_exists(cur, table, column):
-    cur.execute(f"PRAGMA table_info({table})")
-    return column in [row[1] for row in cur.fetchall()]
+def q(sql):
+    if using_postgres():
+        return sql.replace("?", "%s")
+    return sql
 
 
-def add_column_if_missing(cur, table, column, definition):
-    if not column_exists(cur, table, column):
-        cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+def fetchone(conn, sql, params=()):
+    cur = conn.cursor()
+    cur.execute(q(sql), params)
+    return cur.fetchone()
+
+
+def fetchall(conn, sql, params=()):
+    cur = conn.cursor()
+    cur.execute(q(sql), params)
+    return cur.fetchall()
+
+
+def execute(conn, sql, params=()):
+    cur = conn.cursor()
+    cur.execute(q(sql), params)
+    return cur
 
 
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
-            username TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'staff',
-            branch TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS suppliers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT,
-            phone TEXT,
-            address TEXT,
-            tin TEXT,
-            vat_type TEXT,
-            business_type TEXT,
-            created_at TEXT
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_name TEXT NOT NULL,
-            category TEXT,
-            unit TEXT,
-            quantity INTEGER NOT NULL DEFAULT 0,
-            low_stock_limit INTEGER NOT NULL DEFAULT 5,
-            supplier_id INTEGER,
-            branch TEXT,
-            created_at TEXT,
-            FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS stock_transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_id INTEGER NOT NULL,
-            transaction_type TEXT NOT NULL,
-            quantity INTEGER NOT NULL,
-            remarks TEXT,
-            encoded_by TEXT,
-            date_created TEXT NOT NULL,
-            FOREIGN KEY (item_id) REFERENCES items(id)
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS purchase_orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            po_number TEXT UNIQUE NOT NULL,
-            supplier_id INTEGER,
-            po_date TEXT NOT NULL,
-            requested_by TEXT,
-            status TEXT DEFAULT 'Pending',
-            notes TEXT,
-            created_at TEXT,
-            FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS purchase_order_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            po_id INTEGER NOT NULL,
-            item_description TEXT NOT NULL,
-            quantity INTEGER NOT NULL,
-            unit TEXT,
-            unit_price REAL DEFAULT 0,
-            FOREIGN KEY (po_id) REFERENCES purchase_orders(id)
-        )
-    """)
-
-    cur.execute("SELECT id FROM users WHERE username = ?", ("admin",))
-    if not cur.fetchone():
+    if using_postgres():
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                full_name TEXT NOT NULL,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'staff',
+                branch TEXT
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                email TEXT,
+                phone TEXT,
+                address TEXT,
+                tin TEXT,
+                vat_type TEXT,
+                business_type TEXT,
+                created_at TEXT
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS items (
+                id SERIAL PRIMARY KEY,
+                item_name TEXT NOT NULL,
+                category TEXT,
+                unit TEXT,
+                quantity INTEGER NOT NULL DEFAULT 0,
+                low_stock_limit INTEGER NOT NULL DEFAULT 5,
+                supplier_id INTEGER REFERENCES suppliers(id),
+                branch TEXT,
+                created_at TEXT
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS stock_transactions (
+                id SERIAL PRIMARY KEY,
+                item_id INTEGER NOT NULL REFERENCES items(id),
+                transaction_type TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                remarks TEXT,
+                encoded_by TEXT,
+                date_created TEXT NOT NULL
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS purchase_orders (
+                id SERIAL PRIMARY KEY,
+                po_number TEXT UNIQUE NOT NULL,
+                supplier_id INTEGER REFERENCES suppliers(id),
+                po_date TEXT NOT NULL,
+                requested_by TEXT,
+                status TEXT DEFAULT 'Pending',
+                notes TEXT,
+                created_at TEXT
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS purchase_order_items (
+                id SERIAL PRIMARY KEY,
+                po_id INTEGER NOT NULL REFERENCES purchase_orders(id),
+                item_description TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit TEXT,
+                unit_price NUMERIC DEFAULT 0
+            )
+        """)
+    else:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                full_name TEXT NOT NULL,
+                username TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'staff',
+                branch TEXT
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT,
+                phone TEXT,
+                address TEXT,
+                tin TEXT,
+                vat_type TEXT,
+                business_type TEXT,
+                created_at TEXT
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_name TEXT NOT NULL,
+                category TEXT,
+                unit TEXT,
+                quantity INTEGER NOT NULL DEFAULT 0,
+                low_stock_limit INTEGER NOT NULL DEFAULT 5,
+                supplier_id INTEGER,
+                branch TEXT,
+                created_at TEXT,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS stock_transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id INTEGER NOT NULL,
+                transaction_type TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                remarks TEXT,
+                encoded_by TEXT,
+                date_created TEXT NOT NULL,
+                FOREIGN KEY (item_id) REFERENCES items(id)
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS purchase_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                po_number TEXT UNIQUE NOT NULL,
+                supplier_id INTEGER,
+                po_date TEXT NOT NULL,
+                requested_by TEXT,
+                status TEXT DEFAULT 'Pending',
+                notes TEXT,
+                created_at TEXT,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS purchase_order_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                po_id INTEGER NOT NULL,
+                item_description TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit TEXT,
+                unit_price REAL DEFAULT 0,
+                FOREIGN KEY (po_id) REFERENCES purchase_orders(id)
+            )
+        """)
+
+    cur.execute(q("SELECT id FROM users WHERE username = ?"), ("admin",))
+    admin = cur.fetchone()
+
+    if not admin:
+        cur.execute(q("""
             INSERT INTO users (full_name, username, password, role, branch)
             VALUES (?, ?, ?, ?, ?)
-        """, ("Administrator", "admin", "admin123", "admin", "Head Office"))
+        """), ("Administrator", "admin", "admin123", "admin", "Head Office"))
 
     conn.commit()
     conn.close()
@@ -141,17 +239,21 @@ def require_admin():
     check = require_login()
     if check:
         return check
+
     if session.get("role") != "admin":
         flash("Admin access only.", "danger")
         return redirect(url_for("dashboard"))
+
     return None
 
 
 def branch_where(alias="items"):
     role = session.get("role")
     branch = session.get("branch")
+
     if role == "branch_manager" and branch:
         return f" WHERE {alias}.branch = ? ", [branch]
+
     return "", []
 
 
@@ -169,19 +271,10 @@ def login():
         password = request.form.get("password", "").strip()
 
         conn = get_db_connection()
-
-if DATABASE_URL:
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT * FROM users
-        WHERE username = %s AND password = %s
-    """, (username, password))
-    user = cur.fetchone()
-else:
-    user = conn.execute("""
-        SELECT * FROM users
-        WHERE username = ? AND password = ?
-    """, (username, password)).fetchone()
+        user = fetchone(conn, """
+            SELECT * FROM users
+            WHERE username = ? AND password = ?
+        """, (username, password))
         conn.close()
 
         if user:
@@ -214,12 +307,12 @@ def dashboard():
     conn = get_db_connection()
     where_sql, params = branch_where("items")
 
-    total_items = conn.execute(f"SELECT COUNT(*) FROM items {where_sql}", params).fetchone()[0]
-    total_suppliers = conn.execute("SELECT COUNT(*) FROM suppliers").fetchone()[0]
-    total_po = conn.execute("SELECT COUNT(*) FROM purchase_orders").fetchone()[0]
-    total_transactions = conn.execute("SELECT COUNT(*) FROM stock_transactions").fetchone()[0]
+    total_items = fetchone(conn, f"SELECT COUNT(*) AS count FROM items {where_sql}", params)["count"]
+    total_suppliers = fetchone(conn, "SELECT COUNT(*) AS count FROM suppliers")["count"]
+    total_po = fetchone(conn, "SELECT COUNT(*) AS count FROM purchase_orders")["count"]
+    total_transactions = fetchone(conn, "SELECT COUNT(*) AS count FROM stock_transactions")["count"]
 
-    low_stock = conn.execute(f"""
+    low_stock = fetchall(conn, f"""
         SELECT items.*, suppliers.name AS supplier_name
         FROM items
         LEFT JOIN suppliers ON suppliers.id = items.supplier_id
@@ -227,32 +320,32 @@ def dashboard():
         {"AND" if where_sql else "WHERE"} items.quantity <= items.low_stock_limit
         ORDER BY items.quantity ASC
         LIMIT 10
-    """, params).fetchall()
+    """, params)
 
-    recent_transactions = conn.execute("""
+    recent_transactions = fetchall(conn, """
         SELECT stock_transactions.*, items.item_name
         FROM stock_transactions
         JOIN items ON items.id = stock_transactions.item_id
         ORDER BY stock_transactions.id DESC
         LIMIT 10
-    """).fetchall()
+    """)
 
-    category_rows = conn.execute(f"""
+    category_rows = fetchall(conn, f"""
         SELECT COALESCE(category, 'Uncategorized') AS category, COUNT(*) AS total
         FROM items
         {where_sql}
         GROUP BY COALESCE(category, 'Uncategorized')
         ORDER BY total DESC
         LIMIT 8
-    """, params).fetchall()
+    """, params)
 
-    stock_rows = conn.execute(f"""
+    stock_rows = fetchall(conn, f"""
         SELECT item_name, quantity
         FROM items
         {where_sql}
         ORDER BY quantity DESC
         LIMIT 8
-    """, params).fetchall()
+    """, params)
 
     conn.close()
 
@@ -281,7 +374,7 @@ def users():
 
     if request.method == "POST":
         try:
-            conn.execute("""
+            execute(conn, """
                 INSERT INTO users (full_name, username, password, role, branch)
                 VALUES (?, ?, ?, ?, ?)
             """, (
@@ -293,12 +386,14 @@ def users():
             ))
             conn.commit()
             flash("User account created successfully.", "success")
-        except sqlite3.IntegrityError:
-            flash("Username already exists.", "danger")
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error creating user: {e}", "danger")
+
         conn.close()
         return redirect(url_for("users"))
 
-    user_list = conn.execute("SELECT * FROM users ORDER BY role, full_name").fetchall()
+    user_list = fetchall(conn, "SELECT * FROM users ORDER BY role, full_name")
     conn.close()
     return render_template("users.html", users=user_list)
 
@@ -314,9 +409,10 @@ def delete_user(user_id):
         return redirect(url_for("users"))
 
     conn = get_db_connection()
-    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    execute(conn, "DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
     conn.close()
+
     flash("User deleted successfully.", "success")
     return redirect(url_for("users"))
 
@@ -330,7 +426,7 @@ def suppliers():
     conn = get_db_connection()
 
     if request.method == "POST":
-        conn.execute("""
+        execute(conn, """
             INSERT INTO suppliers (name, email, phone, address, tin, vat_type, business_type, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
@@ -345,10 +441,11 @@ def suppliers():
         ))
         conn.commit()
         conn.close()
+
         flash("Supplier added successfully.", "success")
         return redirect(url_for("suppliers"))
 
-    supplier_list = conn.execute("SELECT * FROM suppliers ORDER BY name ASC").fetchall()
+    supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
     conn.close()
     return render_template("suppliers.html", suppliers=supplier_list)
 
@@ -362,7 +459,7 @@ def items():
     conn = get_db_connection()
 
     if request.method == "POST":
-        conn.execute("""
+        execute(conn, """
             INSERT INTO items
             (item_name, category, unit, quantity, low_stock_limit, supplier_id, branch, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -378,19 +475,21 @@ def items():
         ))
         conn.commit()
         conn.close()
+
         flash("Item added successfully.", "success")
         return redirect(url_for("items"))
 
     where_sql, params = branch_where("items")
-    item_list = conn.execute(f"""
+
+    item_list = fetchall(conn, f"""
         SELECT items.*, suppliers.name AS supplier_name
         FROM items
         LEFT JOIN suppliers ON suppliers.id = items.supplier_id
         {where_sql}
         ORDER BY items.item_name ASC
-    """, params).fetchall()
+    """, params)
 
-    supplier_list = conn.execute("SELECT * FROM suppliers ORDER BY name ASC").fetchall()
+    supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
     conn.close()
     return render_template("items.html", items=item_list, suppliers=supplier_list)
 
@@ -413,23 +512,28 @@ def stock_in():
             conn.close()
             return redirect(url_for("stock_in"))
 
-        conn.execute("UPDATE items SET quantity = quantity + ? WHERE id = ?", (quantity, item_id))
-        conn.execute("""
+        execute(conn, "UPDATE items SET quantity = quantity + ? WHERE id = ?", (quantity, item_id))
+        execute(conn, """
             INSERT INTO stock_transactions
             (item_id, transaction_type, quantity, remarks, encoded_by, date_created)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (
-            item_id, "Stock In", quantity, remarks, session.get("full_name"),
+            item_id,
+            "Stock In",
+            quantity,
+            remarks,
+            session.get("full_name"),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
 
         conn.commit()
         conn.close()
+
         flash("Stock added successfully.", "success")
         return redirect(url_for("stock_in"))
 
     where_sql, params = branch_where("items")
-    item_list = conn.execute(f"SELECT * FROM items {where_sql} ORDER BY item_name ASC", params).fetchall()
+    item_list = fetchall(conn, f"SELECT * FROM items {where_sql} ORDER BY item_name ASC", params)
     conn.close()
     return render_template("stock_in.html", items=item_list)
 
@@ -447,7 +551,7 @@ def stock_out():
         quantity = int(request.form.get("quantity") or 0)
         remarks = request.form.get("remarks")
 
-        item = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+        item = fetchone(conn, "SELECT * FROM items WHERE id = ?", (item_id,))
 
         if quantity <= 0:
             flash("Quantity must be greater than zero.", "danger")
@@ -459,23 +563,28 @@ def stock_out():
             conn.close()
             return redirect(url_for("stock_out"))
 
-        conn.execute("UPDATE items SET quantity = quantity - ? WHERE id = ?", (quantity, item_id))
-        conn.execute("""
+        execute(conn, "UPDATE items SET quantity = quantity - ? WHERE id = ?", (quantity, item_id))
+        execute(conn, """
             INSERT INTO stock_transactions
             (item_id, transaction_type, quantity, remarks, encoded_by, date_created)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (
-            item_id, "Stock Out", quantity, remarks, session.get("full_name"),
+            item_id,
+            "Stock Out",
+            quantity,
+            remarks,
+            session.get("full_name"),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
 
         conn.commit()
         conn.close()
+
         flash("Stock released successfully.", "success")
         return redirect(url_for("stock_out"))
 
     where_sql, params = branch_where("items")
-    item_list = conn.execute(f"SELECT * FROM items {where_sql} ORDER BY item_name ASC", params).fetchall()
+    item_list = fetchall(conn, f"SELECT * FROM items {where_sql} ORDER BY item_name ASC", params)
     conn.close()
     return render_template("stock_out.html", items=item_list)
 
@@ -487,13 +596,14 @@ def transactions():
         return check
 
     conn = get_db_connection()
-    rows = conn.execute("""
+    rows = fetchall(conn, """
         SELECT stock_transactions.*, items.item_name, items.branch
         FROM stock_transactions
         JOIN items ON items.id = stock_transactions.item_id
         ORDER BY stock_transactions.id DESC
-    """).fetchall()
+    """)
     conn.close()
+
     return render_template("transactions.html", transactions=rows)
 
 
@@ -512,17 +622,38 @@ def purchase_orders():
         requested_by = request.form.get("requested_by")
         notes = request.form.get("notes")
 
-        cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO purchase_orders
-            (po_number, supplier_id, po_date, requested_by, status, notes, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (
-            po_number, supplier_id, po_date, requested_by, "Pending", notes,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ))
+        if using_postgres():
+            cur = execute(conn, """
+                INSERT INTO purchase_orders
+                (po_number, supplier_id, po_date, requested_by, status, notes, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                RETURNING id
+            """, (
+                po_number,
+                supplier_id,
+                po_date,
+                requested_by,
+                "Pending",
+                notes,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ))
+            po_id = cur.fetchone()["id"]
+        else:
+            cur = execute(conn, """
+                INSERT INTO purchase_orders
+                (po_number, supplier_id, po_date, requested_by, status, notes, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                po_number,
+                supplier_id,
+                po_date,
+                requested_by,
+                "Pending",
+                notes,
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ))
+            po_id = cur.lastrowid
 
-        po_id = cur.lastrowid
         descriptions = request.form.getlist("description[]")
         quantities = request.form.getlist("po_quantity[]")
         units = request.form.getlist("po_unit[]")
@@ -530,7 +661,7 @@ def purchase_orders():
 
         for desc, qty, unit, price in zip(descriptions, quantities, units, prices):
             if desc and desc.strip():
-                conn.execute("""
+                execute(conn, """
                     INSERT INTO purchase_order_items
                     (po_id, item_description, quantity, unit, unit_price)
                     VALUES (?, ?, ?, ?, ?)
@@ -544,18 +675,20 @@ def purchase_orders():
 
         conn.commit()
         conn.close()
+
         flash("Purchase order created successfully.", "success")
         return redirect(url_for("purchase_orders"))
 
-    po_list = conn.execute("""
+    po_list = fetchall(conn, """
         SELECT purchase_orders.*, suppliers.name AS supplier_name
         FROM purchase_orders
         LEFT JOIN suppliers ON suppliers.id = purchase_orders.supplier_id
         ORDER BY purchase_orders.id DESC
-    """).fetchall()
+    """)
 
-    supplier_list = conn.execute("SELECT * FROM suppliers ORDER BY name ASC").fetchall()
+    supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
     conn.close()
+
     return render_template("purchase_orders.html", purchase_orders=po_list, suppliers=supplier_list)
 
 
@@ -566,19 +699,20 @@ def print_purchase_order(po_id):
         return check
 
     conn = get_db_connection()
-    po = conn.execute("""
+
+    po = fetchone(conn, """
         SELECT purchase_orders.*, suppliers.name AS supplier_name, suppliers.address,
                suppliers.tin, suppliers.phone, suppliers.email
         FROM purchase_orders
         LEFT JOIN suppliers ON suppliers.id = purchase_orders.supplier_id
         WHERE purchase_orders.id = ?
-    """, (po_id,)).fetchone()
+    """, (po_id,))
 
-    po_items = conn.execute("""
+    po_items = fetchall(conn, """
         SELECT *, quantity * unit_price AS line_total
         FROM purchase_order_items
         WHERE po_id = ?
-    """, (po_id,)).fetchall()
+    """, (po_id,))
     conn.close()
 
     if not po:
@@ -586,7 +720,13 @@ def print_purchase_order(po_id):
         return redirect(url_for("purchase_orders"))
 
     grand_total = sum([item["line_total"] or 0 for item in po_items])
-    return render_template("purchase_order_print.html", po=po, po_items=po_items, grand_total=grand_total)
+
+    return render_template(
+        "purchase_order_print.html",
+        po=po,
+        po_items=po_items,
+        grand_total=grand_total
+    )
 
 
 @app.route("/reports")
@@ -596,10 +736,12 @@ def reports():
         return check
 
     conn = get_db_connection()
-    total_items = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
-    low_stock_count = conn.execute("SELECT COUNT(*) FROM items WHERE quantity <= low_stock_limit").fetchone()[0]
-    stock_in_count = conn.execute("SELECT COUNT(*) FROM stock_transactions WHERE transaction_type = 'Stock In'").fetchone()[0]
-    stock_out_count = conn.execute("SELECT COUNT(*) FROM stock_transactions WHERE transaction_type = 'Stock Out'").fetchone()[0]
+
+    total_items = fetchone(conn, "SELECT COUNT(*) AS count FROM items")["count"]
+    low_stock_count = fetchone(conn, "SELECT COUNT(*) AS count FROM items WHERE quantity <= low_stock_limit")["count"]
+    stock_in_count = fetchone(conn, "SELECT COUNT(*) AS count FROM stock_transactions WHERE transaction_type = 'Stock In'")["count"]
+    stock_out_count = fetchone(conn, "SELECT COUNT(*) AS count FROM stock_transactions WHERE transaction_type = 'Stock Out'")["count"]
+
     conn.close()
 
     return render_template(
@@ -618,18 +760,19 @@ def export_items():
         return check
 
     conn = get_db_connection()
-    rows = conn.execute("""
+    rows = fetchall(conn, """
         SELECT items.item_name, items.category, items.unit, items.quantity,
                items.low_stock_limit, items.branch, suppliers.name AS supplier_name
         FROM items
         LEFT JOIN suppliers ON suppliers.id = items.supplier_id
         ORDER BY items.item_name ASC
-    """).fetchall()
+    """)
     conn.close()
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Inventory Items"
+
     ws.append(["Iligan Cement Multi-Purpose Cooperative"])
     ws.append(["Inventory Items Report"])
     ws.append(["Generated:", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
@@ -666,17 +809,18 @@ def export_transactions():
         return check
 
     conn = get_db_connection()
-    rows = conn.execute("""
+    rows = fetchall(conn, """
         SELECT stock_transactions.*, items.item_name, items.branch
         FROM stock_transactions
         JOIN items ON items.id = stock_transactions.item_id
         ORDER BY stock_transactions.id DESC
-    """).fetchall()
+    """)
     conn.close()
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Transactions"
+
     ws.append(["Iligan Cement Multi-Purpose Cooperative"])
     ws.append(["Stock Transactions Report"])
     ws.append(["Generated:", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
