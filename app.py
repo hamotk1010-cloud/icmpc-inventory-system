@@ -989,6 +989,75 @@ def purchase_orders():
 
     return render_template("purchase_orders.html", purchase_orders=po_list, suppliers=supplier_list)
 
+@app.route("/purchase-orders/add", methods=["GET", "POST"])
+def add_purchase_order():
+    check = require_login()
+    if check:
+        return check
+
+    conn = get_db_connection()
+
+    if request.method == "POST":
+        po_number = request.form.get("po_number")
+        supplier_id = request.form.get("supplier_id")
+        po_date = request.form.get("po_date")
+        requested_by = request.form.get("requested_by")
+        notes = request.form.get("notes")
+
+        # =============================
+        # INSERT PO HEADER
+        # =============================
+        execute(conn, """
+            INSERT INTO purchase_orders
+            (po_number, supplier_id, po_date, requested_by, notes, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            po_number,
+            supplier_id,
+            po_date,
+            requested_by,
+            notes,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+
+        # get last inserted PO ID
+        if using_postgres():
+            po_id = fetchone(conn, "SELECT LASTVAL() AS id")["id"]
+        else:
+            po_id = fetchone(conn, "SELECT last_insert_rowid() AS id")["id"]
+
+        # =============================
+        # MULTIPLE ITEMS (THIS IS THE IMPORTANT PART)
+        # =============================
+        descriptions = request.form.getlist("description[]")
+        quantities = request.form.getlist("quantity[]")
+        units = request.form.getlist("unit[]")
+        prices = request.form.getlist("price[]")
+
+        for i in range(len(descriptions)):
+            if descriptions[i]:  # avoid empty rows
+                execute(conn, """
+                    INSERT INTO purchase_order_items
+                    (po_id, item_description, quantity, unit, unit_price)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    po_id,
+                    descriptions[i],
+                    int(quantities[i] or 0),
+                    units[i],
+                    float(prices[i] or 0)
+                ))
+
+        conn.commit()
+        conn.close()
+
+        flash("Purchase Order created successfully.", "success")
+        return redirect(url_for("purchase_orders"))
+
+    suppliers = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
+    conn.close()
+
+    return render_template("purchase_order_add.html", suppliers=suppliers)
 
 @app.route("/purchase-orders/<int:po_id>/print")
 def print_purchase_order(po_id):

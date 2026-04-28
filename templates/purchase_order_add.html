@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Create Purchase Order</h1>
+
+<section class="panel">
+    <form method="POST">
+
+        <div class="form-grid">
+            <input name="po_number" placeholder="PO Number" required>
+
+            <select name="supplier_id" required>
+                <option value="">Select Supplier</option>
+                {% for s in suppliers %}
+                <option value="{{ s.id }}">{{ s.name }}</option>
+                {% endfor %}
+            </select>
+
+            <input type="date" name="po_date" required>
+
+            <input name="requested_by" placeholder="Requested By">
+        </div>
+
+        <h3 style="margin-top:20px;">Items</h3>
+
+        <table id="poTable">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Qty</th>
+                    <th>Unit</th>
+                    <th>Unit Price</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td><input name="description[]" required></td>
+                    <td><input name="quantity[]" type="number" required></td>
+                    <td><input name="unit[]"></td>
+                    <td><input name="price[]" type="number" step="0.01"></td>
+                    <td>
+                        <button type="button" onclick="removeRow(this)">❌</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <button type="button" onclick="addRow()">➕ Add Item</button>
+
+        <br><br>
+
+        <textarea name="notes" placeholder="Notes"></textarea>
+
+        <br><br>
+
+        <button type="submit">Save Purchase Order</button>
+    </form>
+</section>
+
+<script>
+function addRow() {
+    let table = document.getElementById("poTable").getElementsByTagName('tbody')[0];
+
+    let newRow = table.insertRow();
+
+    newRow.innerHTML = `
+        <td><input name="description[]" required></td>
+        <td><input name="quantity[]" type="number" required></td>
+        <td><input name="unit[]"></td>
+        <td><input name="price[]" type="number" step="0.01"></td>
+        <td><button type="button" onclick="removeRow(this)">❌</button></td>
+    `;
+}
+
+function removeRow(btn) {
+    let row = btn.parentNode.parentNode;
+    row.parentNode.removeChild(row);
+}
+</script>
+
+{% endblock %}
