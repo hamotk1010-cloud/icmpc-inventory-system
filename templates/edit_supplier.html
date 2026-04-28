@@ -3,29 +3,51 @@
 
 <h1>Edit Supplier</h1>
 
-<div class="form-box">
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Supplier Information</h2>
+            <p style="color:#64748b; margin-top:-8px;">Update supplier details and offered category.</p>
+        </div>
+
+        <a href="{{ url_for('suppliers') }}" class="btn-link">Back to Suppliers</a>
+    </div>
 
     <form method="POST" class="form-grid">
+        <input name="name" value="{{ supplier.name or '' }}" placeholder="Supplier Name" required>
 
-        <input name="name" value="{{ supplier.name }}" required>
+        <input name="email" value="{{ supplier.email or '' }}" placeholder="Email">
 
-        <input name="email" value="{{ supplier.email }}">
-        <input name="phone" value="{{ supplier.phone }}">
-        <input name="address" value="{{ supplier.address }}">
+        <input name="phone" value="{{ supplier.phone or '' }}" placeholder="Phone">
 
-        <select name="category">
-            <option {% if not supplier.category %}selected{% endif %}>Select Category</option>
-            <option {% if supplier.category == "Office Supplies" %}selected{% endif %}>Office Supplies</option>
-            <option {% if supplier.category == "Furniture and Fixtures" %}selected{% endif %}>Furniture and Fixtures</option>
-            <option {% if supplier.category == "Equipment" %}selected{% endif %}>Equipment</option>
-            <option {% if supplier.category == "Food" %}selected{% endif %}>Food</option>
-            <option {% if supplier.category == "Services" %}selected{% endif %}>Services</option>
+        <input name="tin" value="{{ supplier.tin or '' }}" placeholder="TIN">
+
+        <select name="vat_type">
+            <option value="">VAT Type</option>
+            <option value="VAT" {% if supplier.vat_type == "VAT" %}selected{% endif %}>VAT</option>
+            <option value="Non-VAT" {% if supplier.vat_type == "Non-VAT" %}selected{% endif %}>Non-VAT</option>
         </select>
 
+        <select name="business_type">
+            <option value="">Business Type</option>
+            <option value="Corporation" {% if supplier.business_type == "Corporation" %}selected{% endif %}>Corporation</option>
+            <option value="Sole Proprietorship" {% if supplier.business_type == "Sole Proprietorship" %}selected{% endif %}>Sole Proprietorship</option>
+        </select>
+
+        <select name="category">
+            <option value="">Category Offered</option>
+            <option value="Office Supplies" {% if supplier.category == "Office Supplies" %}selected{% endif %}>Office Supplies</option>
+            <option value="Furniture and Fixtures" {% if supplier.category == "Furniture and Fixtures" %}selected{% endif %}>Furniture and Fixtures</option>
+            <option value="Equipment" {% if supplier.category == "Equipment" %}selected{% endif %}>Equipment</option>
+            <option value="Expenses" {% if supplier.category == "Expenses" %}selected{% endif %}>Expenses</option>
+            <option value="Food" {% if supplier.category == "Food" %}selected{% endif %}>Food</option>
+            <option value="Services" {% if supplier.category == "Services" %}selected{% endif %}>Services</option>
+        </select>
+
+        <textarea name="address" placeholder="Address">{{ supplier.address or '' }}</textarea>
+
         <button type="submit">Update Supplier</button>
-
     </form>
-
-</div>
+</section>
 
 {% endblock %}

@@ -1231,6 +1231,7 @@ def edit_supplier(supplier_id):
         return check
 
     if session.get("role") != "admin":
+        flash("Admin access only.", "danger")
         return redirect(url_for("suppliers"))
 
     conn = get_db_connection()
@@ -1238,13 +1239,16 @@ def edit_supplier(supplier_id):
     if request.method == "POST":
         execute(conn, """
             UPDATE suppliers
-            SET name = ?, email = ?, phone = ?, address = ?, category = ?
+            SET name = ?, email = ?, phone = ?, address = ?, tin = ?, vat_type = ?, business_type = ?, category = ?
             WHERE id = ?
         """, (
             request.form.get("name"),
             request.form.get("email"),
             request.form.get("phone"),
             request.form.get("address"),
+            request.form.get("tin"),
+            request.form.get("vat_type"),
+            request.form.get("business_type"),
             request.form.get("category"),
             supplier_id
         ))
