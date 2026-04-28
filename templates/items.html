@@ -35,8 +35,30 @@
 <section class="panel">
     <div class="panel-head">
         <h2>Inventory List</h2>
-        <a href="{{ url_for('export_items') }}" class="btn-link">Export Excel</a>
+        <a href="{{ url_for('export_items', 
+    search=request.args.get('search'), 
+    category=request.args.get('category')) }}" 
+class="btn-link">Export Excel</a>
     </div>
+
+<form method="GET" class="form-grid" style="margin-bottom:15px;">
+    
+    <input type="text" name="search" placeholder="Search item..."
+           value="{{ request.args.get('search', '') }}">
+
+    <select name="category">
+        <option value="">All Categories</option>
+        <option value="Office Supplies">Office Supplies</option>
+        <option value="Furniture and Fixtures">Furniture and Fixtures</option>
+        <option value="Equipment">Equipment</option>
+        <option value="Expenses">Expenses</option>
+        <option value="Food">Food</option>
+        <option value="Services">Services</option>
+    </select>
+
+    <button type="submit">Filter</button>
+
+</form>
 
     <table>
         <thead>

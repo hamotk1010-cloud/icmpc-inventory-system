@@ -552,19 +552,39 @@ def items():
         flash("Item added successfully.", "success")
         return redirect(url_for("items"))
 
+    # ✅ FILTER LOGIC
+    search = request.args.get("search", "")
+    category = request.args.get("category", "")
+
     where_sql, params = branch_where("items")
 
-    item_list = fetchall(conn, f"""
+    query = f"""
         SELECT items.*, suppliers.name AS supplier_name
         FROM items
         LEFT JOIN suppliers ON suppliers.id = items.supplier_id
         {where_sql}
-        ORDER BY items.item_name ASC
-    """, params)
+    """
+
+    if search:
+        query += " AND item_name LIKE ?"
+        params.append(f"%{search}%")
+
+    if category:
+        query += " AND category = ?"
+        params.append(category)
+
+    query += " ORDER BY items.item_name ASC"
+
+    item_list = fetchall(conn, query, params)
 
     supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
     conn.close()
-    return render_template("items.html", items=item_list, suppliers=supplier_list)
+
+    return render_template(
+        "items.html",
+        items=item_list,
+        suppliers=supplier_list
+    )
 
 
 @app.route("/stock-in", methods=["GET", "POST"])
@@ -833,13 +853,31 @@ def export_items():
         return check
 
     conn = get_db_connection()
-    rows = fetchall(conn, """
+
+    search = request.args.get("search", "")
+    category = request.args.get("category", "")
+
+    query = """
         SELECT items.item_name, items.category, items.unit, items.quantity,
                items.low_stock_limit, items.branch, suppliers.name AS supplier_name
         FROM items
         LEFT JOIN suppliers ON suppliers.id = items.supplier_id
-        ORDER BY items.item_name ASC
-    """)
+        WHERE 1=1
+    """
+
+    params = []
+
+    if search:
+        query += " AND item_name LIKE ?"
+        params.append(f"%{search}%")
+
+    if category:
+        query += " AND category = ?"
+        params.append(category)
+
+    query += " ORDER BY items.item_name ASC"
+
+    rows = fetchall(conn, query, tuple(params))
     conn.close()
 
     wb = Workbook()
@@ -847,7 +885,7 @@ def export_items():
     ws.title = "Inventory Items"
 
     ws.append(["Iligan Cement Multi-Purpose Cooperative"])
-    ws.append(["Inventory Items Report"])
+    ws.append(["Filtered Inventory Report"])
     ws.append(["Generated:", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
     ws.append([])
     ws.append(["Item Name", "Category", "Unit", "Quantity", "Low Stock Limit", "Branch", "Supplier"])
@@ -870,7 +908,7 @@ def export_items():
     return send_file(
         output,
         as_attachment=True,
-        download_name="ICMPC_Inventory_Items.xlsx",
+        download_name="ICMPC_Filtered_Items.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
