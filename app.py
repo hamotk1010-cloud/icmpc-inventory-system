@@ -1124,6 +1124,38 @@ def export_assignments_pdf():
 def health():
     return "OK - ICMPC Inventory System is running"
 
+@app.route("/items/edit/<int:item_id>", methods=["GET", "POST"])
+def edit_item(item_id):
+    if session.get("role") != "admin":
+        return redirect(url_for("items"))
+
+    conn = get_db_connection()
+
+    if request.method == "POST":
+        execute(conn, """
+            UPDATE items
+            SET item_name = ?, category = ?, quantity = ?, unit = ?, low_stock_limit = ?
+            WHERE id = ?
+        """, (
+            request.form["item_name"],
+            request.form["category"],
+            request.form["quantity"],
+            request.form["unit"],
+            request.form["low_stock_limit"],
+            item_id
+        ))
+
+        conn.commit()
+        conn.close()
+
+        flash("Item updated successfully!", "success")
+        return redirect(url_for("items"))
+
+    item = fetchone(conn, "SELECT * FROM items WHERE id = ?", (item_id,))
+    conn.close()
+
+    return render_template("edit_item.html", item=item)
+
 
 init_db()
 

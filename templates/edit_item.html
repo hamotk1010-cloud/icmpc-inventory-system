@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Edit Item</h1>
+
+<div class="form-box">
+    <form method="POST" class="form-grid">
+
+        <input name="item_name" value="{{ item.item_name }}" required>
+
+        <select name="category" required>
+            <option value="Office Supplies" {% if item.category == "Office Supplies" %}selected{% endif %}>Office Supplies</option>
+            <option value="Furniture and Fixtures" {% if item.category == "Furniture and Fixtures" %}selected{% endif %}>Furniture and Fixtures</option>
+            <option value="Equipment" {% if item.category == "Equipment" %}selected{% endif %}>Equipment</option>
+            <option value="Expenses" {% if item.category == "Expenses" %}selected{% endif %}>Expenses</option>
+            <option value="Food" {% if item.category == "Food" %}selected{% endif %}>Food</option>
+            <option value="Services" {% if item.category == "Services" %}selected{% endif %}>Services</option>
+        </select>
+
+        <input type="number" name="quantity" value="{{ item.quantity }}" required>
+
+        <input name="unit" value="{{ item.unit }}">
+
+        <input type="number" name="low_stock_limit" value="{{ item.low_stock_limit }}">
+
+        <button type="submit">Update Item</button>
+
+    </form>
+</div>
+
+{% endblock %}
