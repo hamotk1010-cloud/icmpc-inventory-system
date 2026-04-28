@@ -1,3 +1,8 @@
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib import colors
@@ -1158,6 +1163,111 @@ def export_transactions():
         as_attachment=True,
         download_name="ICMPC_Stock_Transactions.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+@app.route("/export-transactions-pdf")
+def export_transactions_pdf():
+    check = require_login()
+    if check:
+        return check
+
+    conn = get_db_connection()
+
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
+    category = request.args.get("category", "")
+    search = request.args.get("search", "")
+
+    query = """
+        SELECT stock_transactions.*, 
+               items.item_name, 
+               items.category,
+               employees.employee_name
+        FROM stock_transactions
+        JOIN items ON items.id = stock_transactions.item_id
+        LEFT JOIN employees ON employees.id = stock_transactions.employee_id
+        WHERE 1=1
+    """
+
+    params = []
+
+    if date_from:
+        query += " AND DATE(stock_transactions.date_created) >= ?"
+        params.append(date_from)
+
+    if date_to:
+        query += " AND DATE(stock_transactions.date_created) <= ?"
+        params.append(date_to)
+
+    if category:
+        query += " AND items.category = ?"
+        params.append(category)
+
+    if search:
+        query += """
+        AND (
+            items.item_name LIKE ?
+            OR items.category LIKE ?
+            OR stock_transactions.remarks LIKE ?
+            OR stock_transactions.transaction_type LIKE ?
+            OR employees.employee_name LIKE ?
+        )
+        """
+        for _ in range(5):
+            params.append(f"%{search}%")
+
+    query += " ORDER BY stock_transactions.id DESC"
+
+    rows = fetchall(conn, query, tuple(params))
+    conn.close()
+
+    # =============================
+    # CREATE PDF
+    # =============================
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+
+    styles = getSampleStyleSheet()
+
+    elements = []
+
+    elements.append(Paragraph("ICMPC Inventory System", styles["Title"]))
+    elements.append(Paragraph("Transaction Report", styles["Heading2"]))
+    elements.append(Spacer(1, 10))
+
+    table_data = [["Date", "Item", "Category", "Type", "Qty", "Employee", "Remarks"]]
+
+    for r in rows:
+        table_data.append([
+            r["date_created"],
+            r["item_name"],
+            r["category"],
+            r["transaction_type"],
+            r["quantity"],
+            r["employee_name"] or "",
+            r["remarks"] or ""
+        ])
+
+    table = Table(table_data, repeatRows=1)
+
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), colors.grey),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+        ("GRID", (0,0), (-1,-1), 0.5, colors.black),
+        ("FONTSIZE", (0,0), (-1,-1), 8),
+    ]))
+
+    elements.append(table)
+
+    doc.build(elements)
+
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="Transactions_Report.pdf",
+        mimetype="application/pdf"
     )
 
 @app.route("/audit-logs")
