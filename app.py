@@ -538,8 +538,10 @@ def users():
                 request.form.get("role"),
                 request.form.get("branch")
             ))
+
             conn.commit()
             flash("User account created successfully.", "success")
+
         except Exception as e:
             conn.rollback()
             flash(f"Error creating user: {e}", "danger")
@@ -547,8 +549,22 @@ def users():
         conn.close()
         return redirect(url_for("users"))
 
-    user_list = fetchall(conn, "SELECT * FROM users ORDER BY role, full_name")
+    # MAIN ADMIN CAN SEE ALL USERS
+    if session.get("username") == "admin":
+        user_list = fetchall(conn, """
+            SELECT * FROM users
+            ORDER BY role, full_name
+        """)
+    else:
+        # OTHER ADMINS CANNOT SEE MAIN ADMIN
+        user_list = fetchall(conn, """
+            SELECT * FROM users
+            WHERE username != ?
+            ORDER BY role, full_name
+        """, ("admin",))
+
     conn.close()
+
     return render_template("users.html", users=user_list)
 
 
@@ -558,12 +574,35 @@ def delete_user(user_id):
     if check:
         return check
 
+    conn = get_db_connection()
+
+    user = fetchone(conn, """
+        SELECT * FROM users
+        WHERE id = ?
+    """, (user_id,))
+
+    if not user:
+        conn.close()
+        flash("User not found.", "danger")
+        return redirect(url_for("users"))
+
+    # PREVENT DELETING OWN ACCOUNT
     if user_id == session.get("user_id"):
+        conn.close()
         flash("You cannot delete your own account.", "danger")
         return redirect(url_for("users"))
 
-    conn = get_db_connection()
-    execute(conn, "DELETE FROM users WHERE id = ?", (user_id,))
+    # PREVENT DELETING MAIN ADMIN
+    if user["username"] == "admin":
+        conn.close()
+        flash("Main admin account cannot be deleted.", "danger")
+        return redirect(url_for("users"))
+
+    execute(conn, """
+        DELETE FROM users
+        WHERE id = ?
+    """, (user_id,))
+
     conn.commit()
     conn.close()
 
