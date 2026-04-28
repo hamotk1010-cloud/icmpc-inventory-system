@@ -40,7 +40,16 @@
 
     <table>
         <thead>
-            <tr><th>Item</th><th>Category</th><th>Unit</th><th>Qty</th><th>Limit</th><th>Branch</th><th>Supplier</th></tr>
+            <tr>
+    <th>Item</th>
+    <th>Category</th>
+    <th>Unit</th>
+    <th>Qty</th>
+    <th>Limit</th>
+    <th>Branch</th>
+    <th>Supplier</th>
+    <th>Actions</th>
+</tr>
         </thead>
         <tbody>
         {% for item in items %}
@@ -59,7 +68,7 @@
 </td>
             </tr>
         {% else %}
-            <tr><td colspan="7">No items yet.</td></tr>
+            <tr><td colspan="8">No items yet.</td></tr>
         {% endfor %}
         </tbody>
     </table>
