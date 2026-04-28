@@ -507,17 +507,21 @@ def suppliers():
 
     conn = get_db_connection()
 
-    # ADD SUPPLIER
     if request.method == "POST":
         execute(conn, """
-            INSERT INTO suppliers (name, email, phone, address, category)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO suppliers 
+            (name, email, phone, address, tin, vat_type, business_type, category, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             request.form.get("name"),
             request.form.get("email"),
             request.form.get("phone"),
             request.form.get("address"),
-            request.form.get("category")
+            request.form.get("tin"),
+            request.form.get("vat_type"),
+            request.form.get("business_type"),
+            request.form.get("category"),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
 
         conn.commit()
