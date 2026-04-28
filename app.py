@@ -545,7 +545,9 @@ def items():
 
     conn = get_db_connection()
 
+    # =============================
     # ADD ITEM
+    # =============================
     if request.method == "POST":
         execute(conn, """
             INSERT INTO items
@@ -567,7 +569,9 @@ def items():
         flash("Item added successfully.", "success")
         return redirect(url_for("items"))
 
-    # FILTER
+    # =============================
+    # FILTER LOGIC (FIXED)
+    # =============================
     search = request.args.get("search", "")
     category = request.args.get("category", "")
 
@@ -580,10 +584,20 @@ def items():
 
     params = []
 
+    # branch filter
+    role = session.get("role")
+    branch = session.get("branch")
+
+    if role == "branch_manager" and branch:
+        query += " AND items.branch = ?"
+        params.append(branch)
+
+    # search filter
     if search:
         query += " AND items.item_name LIKE ?"
         params.append(f"%{search}%")
 
+    # category filter
     if category:
         query += " AND items.category = ?"
         params.append(category)
@@ -592,9 +606,7 @@ def items():
 
     item_list = fetchall(conn, query, tuple(params))
 
-    # ✅ IMPORTANT: GET ALL SUPPLIERS (WITH CATEGORY)
     supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
-
     conn.close()
 
     return render_template(
@@ -602,6 +614,61 @@ def items():
         items=item_list,
         suppliers=supplier_list
     )
+
+# =============================
+# DELETE ITEM
+# =============================
+@app.route("/items/delete/<int:item_id>", methods=["POST"])
+def delete_item(item_id):
+    check = require_login()
+    if check:
+        return check
+
+    if session.get("role") != "admin":
+        flash("Admin access only.", "danger")
+        return redirect(url_for("items"))
+
+    conn = get_db_connection()
+
+    # delete related stock transactions (avoid FK issues)
+    execute(conn, "DELETE FROM stock_transactions WHERE item_id = ?", (item_id,))
+
+    # delete the item
+    execute(conn, "DELETE FROM items WHERE id = ?", (item_id,))
+
+    conn.commit()
+    conn.close()
+
+    flash("Item deleted successfully.", "success")
+    return redirect(url_for("items"))
+
+
+# =============================
+# DELETE SUPPLIER
+# =============================
+@app.route("/suppliers/delete/<int:supplier_id>", methods=["POST"])
+def delete_supplier(supplier_id):
+    check = require_login()
+    if check:
+        return check
+
+    if session.get("role") != "admin":
+        flash("Admin access only.", "danger")
+        return redirect(url_for("suppliers"))
+
+    conn = get_db_connection()
+
+    # remove supplier reference from items first
+    execute(conn, "UPDATE items SET supplier_id = NULL WHERE supplier_id = ?", (supplier_id,))
+
+    # delete supplier
+    execute(conn, "DELETE FROM suppliers WHERE id = ?", (supplier_id,))
+
+    conn.commit()
+    conn.close()
+
+    flash("Supplier deleted successfully.", "success")
+    return redirect(url_for("suppliers"))
 
 
 @app.route("/stock-in", methods=["GET", "POST"])
