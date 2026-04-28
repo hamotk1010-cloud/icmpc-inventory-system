@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Edit Supplier</h1>
+
+<div class="form-box">
+
+    <form method="POST" class="form-grid">
+
+        <input name="name" value="{{ supplier.name }}" required>
+
+        <input name="email" value="{{ supplier.email }}">
+        <input name="phone" value="{{ supplier.phone }}">
+        <input name="address" value="{{ supplier.address }}">
+
+        <select name="category">
+            <option {% if not supplier.category %}selected{% endif %}>Select Category</option>
+            <option {% if supplier.category == "Office Supplies" %}selected{% endif %}>Office Supplies</option>
+            <option {% if supplier.category == "Furniture and Fixtures" %}selected{% endif %}>Furniture and Fixtures</option>
+            <option {% if supplier.category == "Equipment" %}selected{% endif %}>Equipment</option>
+            <option {% if supplier.category == "Food" %}selected{% endif %}>Food</option>
+            <option {% if supplier.category == "Services" %}selected{% endif %}>Services</option>
+        </select>
+
+        <button type="submit">Update Supplier</button>
+
+    </form>
+
+</div>
+
+{% endblock %}

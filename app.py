@@ -87,6 +87,12 @@ def init_db():
             )
         """)
 
+        # SAFE MIGRATION: add supplier category column if missing
+        try:
+            cur.execute("ALTER TABLE suppliers ADD COLUMN category TEXT")
+        except Exception:
+            pass
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS items (
                 id SERIAL PRIMARY KEY,
@@ -161,6 +167,12 @@ def init_db():
                 created_at TEXT
             )
         """)
+
+        # SAFE MIGRATION: add supplier category column if missing
+        try:
+            cur.execute("ALTER TABLE suppliers ADD COLUMN category TEXT")
+        except Exception:
+            pass
 
         cur.execute("""
             CREATE TABLE IF NOT EXISTS items (
@@ -277,9 +289,6 @@ def init_db():
 
     conn.commit()
     conn.close()
-
-
-
 
 
 def logged_in():
@@ -498,20 +507,19 @@ def suppliers():
 
     conn = get_db_connection()
 
+    # ADD SUPPLIER
     if request.method == "POST":
         execute(conn, """
-            INSERT INTO suppliers (name, email, phone, address, tin, vat_type, business_type, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO suppliers (name, email, phone, address, category)
+            VALUES (?, ?, ?, ?, ?)
         """, (
             request.form.get("name"),
             request.form.get("email"),
             request.form.get("phone"),
             request.form.get("address"),
-            request.form.get("tin"),
-            request.form.get("vat_type"),
-            request.form.get("business_type"),
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            request.form.get("category")
         ))
+
         conn.commit()
         conn.close()
 
@@ -520,6 +528,7 @@ def suppliers():
 
     supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
     conn.close()
+
     return render_template("suppliers.html", suppliers=supplier_list)
 
 
@@ -1208,6 +1217,43 @@ def edit_item(item_id):
     conn.close()
 
     return render_template("edit_item.html", item=item)
+
+
+@app.route("/suppliers/edit/<int:supplier_id>", methods=["GET", "POST"])
+def edit_supplier(supplier_id):
+    check = require_login()
+    if check:
+        return check
+
+    if session.get("role") != "admin":
+        return redirect(url_for("suppliers"))
+
+    conn = get_db_connection()
+
+    if request.method == "POST":
+        execute(conn, """
+            UPDATE suppliers
+            SET name = ?, email = ?, phone = ?, address = ?, category = ?
+            WHERE id = ?
+        """, (
+            request.form.get("name"),
+            request.form.get("email"),
+            request.form.get("phone"),
+            request.form.get("address"),
+            request.form.get("category"),
+            supplier_id
+        ))
+
+        conn.commit()
+        conn.close()
+
+        flash("Supplier updated successfully.", "success")
+        return redirect(url_for("suppliers"))
+
+    supplier = fetchone(conn, "SELECT * FROM suppliers WHERE id = ?", (supplier_id,))
+    conn.close()
+
+    return render_template("edit_supplier.html", supplier=supplier)
 
 
 init_db()
