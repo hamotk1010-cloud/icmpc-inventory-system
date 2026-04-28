@@ -7,29 +7,44 @@
     <h2>Add Stock</h2>
 
     <form method="POST" class="form-grid">
-        <select name="item_id" id="itemSelect" required onchange="fillItemDetails()">
-            <option value="">Select Item</option>
-            {% for item in items %}
-            <option
-                value="{{ item.id }}"
-                data-category="{{ item.category or '' }}"
-                data-unit="{{ item.unit or '' }}"
-                data-quantity="{{ item.quantity or 0 }}"
-                data-branch="{{ item.branch or '' }}"
-                data-supplier="{{ item.supplier_name or 'N/A' }}">
-                {{ item.item_name }}
+
+        <select name="po_id" id="poSelect" onchange="filterPoItems()">
+            <option value="">Select Purchase Order Optional</option>
+            {% for po in purchase_orders %}
+            <option value="{{ po.id }}">
+                {{ po.po_number }} - {{ po.supplier_name or "No Supplier" }} - {{ po.status or "Pending" }}
             </option>
             {% endfor %}
         </select>
 
-        <select name="po_id">
-    <option value="">Select Purchase Order (Optional)</option>
-    {% for po in purchase_orders %}
-    <option value="{{ po.id }}">
-        {{ po.po_number }} - {{ po.supplier_name if po.supplier_name else "" }}
-    </option>
-    {% endfor %}
-</select>
+        <select name="po_item_id" id="poItemSelect">
+            <option value="">Select PO Item Optional</option>
+            {% for pi in po_items %}
+            <option value="{{ pi.id }}"
+                    data-po-id="{{ pi.po_id }}"
+                    data-description="{{ pi.item_description }}"
+                    data-ordered="{{ pi.quantity }}"
+                    data-received="{{ pi.received_quantity or 0 }}">
+                {{ pi.po_number }} - {{ pi.item_description }} 
+                | Ordered: {{ pi.quantity }} 
+                | Received: {{ pi.received_quantity or 0 }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <select name="item_id" id="itemSelect" required onchange="fillItemDetails()">
+            <option value="">Select Inventory Item</option>
+            {% for item in items %}
+            <option value="{{ item.id }}"
+                    data-category="{{ item.category or '' }}"
+                    data-unit="{{ item.unit or '' }}"
+                    data-quantity="{{ item.quantity or 0 }}"
+                    data-branch="{{ item.branch or '' }}"
+                    data-supplier="{{ item.supplier_name or 'N/A' }}">
+                {{ item.item_name }}
+            </option>
+            {% endfor %}
+        </select>
 
         <input id="categoryBox" placeholder="Category" readonly>
         <input id="unitBox" placeholder="Unit" readonly>
@@ -37,7 +52,7 @@
         <input id="branchBox" placeholder="Branch" readonly>
         <input id="supplierBox" placeholder="Supplier" readonly>
 
-        <input name="quantity" type="number" placeholder="Quantity to Add" min="1" required>
+        <input name="quantity" type="number" placeholder="Quantity Received" min="1" required>
 
         <textarea name="remarks" placeholder="Remarks"></textarea>
 
@@ -55,6 +70,27 @@ function fillItemDetails() {
     document.getElementById("currentStockBox").value = option.getAttribute("data-quantity") || "";
     document.getElementById("branchBox").value = option.getAttribute("data-branch") || "";
     document.getElementById("supplierBox").value = option.getAttribute("data-supplier") || "";
+}
+
+function filterPoItems() {
+    const poId = document.getElementById("poSelect").value;
+    const poItemSelect = document.getElementById("poItemSelect");
+    const options = poItemSelect.querySelectorAll("option");
+
+    poItemSelect.value = "";
+
+    options.forEach(option => {
+        if (option.value === "") {
+            option.style.display = "block";
+            return;
+        }
+
+        if (poId === "" || option.getAttribute("data-po-id") === poId) {
+            option.style.display = "block";
+        } else {
+            option.style.display = "none";
+        }
+    });
 }
 </script>
 

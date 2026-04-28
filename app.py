@@ -339,6 +339,26 @@ def init_db():
     except:
         conn.rollback()
 
+        # SAFE MIGRATION: track received quantity per PO item
+    try:
+        cur.execute("ALTER TABLE purchase_order_items ADD COLUMN received_quantity INTEGER DEFAULT 0")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
+    # SAFE MIGRATION: link stock transactions to PO and PO item
+    try:
+        cur.execute("ALTER TABLE stock_transactions ADD COLUMN po_id INTEGER")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
+    try:
+        cur.execute("ALTER TABLE stock_transactions ADD COLUMN po_item_id INTEGER")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
     conn.commit()
     conn.close()
 
@@ -757,20 +777,23 @@ def stock_in():
         quantity = int(request.form.get("quantity") or 0)
         remarks = request.form.get("remarks")
         po_id = request.form.get("po_id") or None
+        po_item_id = request.form.get("po_item_id") or None
 
         if quantity <= 0:
-            flash("Invalid quantity.", "danger")
+            flash("Quantity must be greater than zero.", "danger")
             conn.close()
             return redirect(url_for("stock_in"))
 
-        # UPDATE STOCK
-        execute(conn, "UPDATE items SET quantity = quantity + ? WHERE id = ?", (quantity, item_id))
+        execute(conn, """
+            UPDATE items 
+            SET quantity = quantity + ? 
+            WHERE id = ?
+        """, (quantity, item_id))
 
-        # SAVE TRANSACTION
         execute(conn, """
             INSERT INTO stock_transactions
-            (item_id, transaction_type, quantity, remarks, encoded_by, po_id, date_created)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (item_id, transaction_type, quantity, remarks, encoded_by, po_id, po_item_id, date_created)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             item_id,
             "Stock In",
@@ -778,37 +801,81 @@ def stock_in():
             remarks,
             session.get("full_name"),
             po_id,
+            po_item_id,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
 
-        # =============================
-        # AUTO UPDATE PO STATUS
-        # =============================
+        if po_item_id:
+            execute(conn, """
+                UPDATE purchase_order_items
+                SET received_quantity = COALESCE(received_quantity, 0) + ?
+                WHERE id = ?
+            """, (quantity, po_item_id))
+
         if po_id:
+            po_items = fetchall(conn, """
+                SELECT quantity, COALESCE(received_quantity, 0) AS received_quantity
+                FROM purchase_order_items
+                WHERE po_id = ?
+            """, (po_id,))
+
+            total_ordered = sum([int(x["quantity"] or 0) for x in po_items])
+            total_received = sum([int(x["received_quantity"] or 0) for x in po_items])
+
+            if total_received <= 0:
+                new_status = "Pending"
+            elif total_received < total_ordered:
+                new_status = "Partial"
+            else:
+                new_status = "Received"
+
             execute(conn, """
                 UPDATE purchase_orders
-                SET status = 'Received'
+                SET status = ?
                 WHERE id = ?
-            """, (po_id,))
+            """, (new_status, po_id))
 
         conn.commit()
         conn.close()
 
-        flash("Stock added and PO updated.", "success")
+        flash("Stock added successfully and PO status updated.", "success")
         return redirect(url_for("stock_in"))
 
-    items = fetchall(conn, "SELECT * FROM items ORDER BY item_name ASC")
+    item_list = fetchall(conn, """
+        SELECT items.*, suppliers.name AS supplier_name
+        FROM items
+        LEFT JOIN suppliers ON suppliers.id = items.supplier_id
+        ORDER BY items.item_name ASC
+    """)
 
-    # ONLY SHOW PENDING PO
     po_list = fetchall(conn, """
-        SELECT * FROM purchase_orders
-        WHERE status = 'Pending'
-        ORDER BY id DESC
+        SELECT purchase_orders.*, suppliers.name AS supplier_name
+        FROM purchase_orders
+        LEFT JOIN suppliers ON suppliers.id = purchase_orders.supplier_id
+        WHERE purchase_orders.status IS NULL 
+           OR purchase_orders.status = 'Pending'
+           OR purchase_orders.status = 'Partial'
+        ORDER BY purchase_orders.id DESC
+    """)
+
+    po_item_list = fetchall(conn, """
+        SELECT purchase_order_items.*, purchase_orders.po_number
+        FROM purchase_order_items
+        JOIN purchase_orders ON purchase_orders.id = purchase_order_items.po_id
+        WHERE purchase_orders.status IS NULL 
+           OR purchase_orders.status = 'Pending'
+           OR purchase_orders.status = 'Partial'
+        ORDER BY purchase_orders.id DESC
     """)
 
     conn.close()
 
-    return render_template("stock_in.html", items=items, purchase_orders=po_list)
+    return render_template(
+        "stock_in.html",
+        items=item_list,
+        purchase_orders=po_list,
+        po_items=po_item_list
+    )
 
 
 @app.route("/stock-out", methods=["GET", "POST"])
@@ -990,14 +1057,15 @@ def purchase_orders():
                 if desc and desc.strip():
                     execute(conn, """
                         INSERT INTO purchase_order_items
-                        (po_id, item_description, quantity, unit, unit_price)
-                        VALUES (?, ?, ?, ?, ?)
+                        (po_id, item_description, quantity, unit, unit_price, received_quantity)
+                        VALUES (?, ?, ?, ?, ?, ?)
                     """, (
                         po_id,
                         desc.strip(),
                         int(qty or 0),
                         unit,
-                        float(price or 0)
+                        float(price or 0),
+                        0
                     ))
 
             conn.commit()
@@ -1022,7 +1090,11 @@ def purchase_orders():
     supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
     conn.close()
 
-    return render_template("purchase_orders.html", purchase_orders=po_list, suppliers=supplier_list)
+    return render_template(
+        "purchase_orders.html",
+        purchase_orders=po_list,
+        suppliers=supplier_list
+    )
 
 @app.route("/purchase-orders/delete/<int:po_id>", methods=["POST"])
 def delete_purchase_order(po_id):
