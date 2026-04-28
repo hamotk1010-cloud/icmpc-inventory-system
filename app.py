@@ -1182,6 +1182,8 @@ def export_transactions_pdf():
         SELECT stock_transactions.*, 
                items.item_name, 
                items.category,
+               items.unit,
+               items.branch,
                employees.employee_name
         FROM stock_transactions
         JOIN items ON items.id = stock_transactions.item_id
@@ -1208,12 +1210,13 @@ def export_transactions_pdf():
         AND (
             items.item_name LIKE ?
             OR items.category LIKE ?
+            OR items.branch LIKE ?
             OR stock_transactions.remarks LIKE ?
             OR stock_transactions.transaction_type LIKE ?
             OR employees.employee_name LIKE ?
         )
         """
-        for _ in range(5):
+        for _ in range(6):
             params.append(f"%{search}%")
 
     query += " ORDER BY stock_transactions.id DESC"
@@ -1221,52 +1224,113 @@ def export_transactions_pdf():
     rows = fetchall(conn, query, tuple(params))
     conn.close()
 
-    # =============================
-    # CREATE PDF
-    # =============================
     buffer = BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4)
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=25,
+        leftMargin=25,
+        topMargin=25,
+        bottomMargin=25
+    )
 
     styles = getSampleStyleSheet()
-
     elements = []
 
-    elements.append(Paragraph("ICMPC Inventory System", styles["Title"]))
-    elements.append(Paragraph("Transaction Report", styles["Heading2"]))
-    elements.append(Spacer(1, 10))
+    title_style = styles["Title"]
+    title_style.textColor = colors.HexColor("#123b7a")
 
-    table_data = [["Date", "Item", "Category", "Type", "Qty", "Employee", "Remarks"]]
+    normal_style = styles["Normal"]
+
+    elements.append(Paragraph("Iligan Cement Multi-Purpose Cooperative", title_style))
+    elements.append(Paragraph("Inventory Transaction Report", styles["Heading2"]))
+    elements.append(Paragraph(
+        "Generated: " + datetime.now().strftime("%B %d, %Y %I:%M %p"),
+        normal_style
+    ))
+
+    filter_text = f"""
+    <b>Filters:</b>
+    Search: {search or 'All'} |
+    Category: {category or 'All'} |
+    Date From: {date_from or 'All'} |
+    Date To: {date_to or 'All'}
+    """
+    elements.append(Paragraph(filter_text, normal_style))
+    elements.append(Spacer(1, 14))
+
+    table_data = [[
+        "Date",
+        "Item",
+        "Category",
+        "Branch",
+        "Type",
+        "Qty",
+        "Employee",
+        "Remarks"
+    ]]
 
     for r in rows:
         table_data.append([
-            r["date_created"],
-            r["item_name"],
-            r["category"],
-            r["transaction_type"],
-            r["quantity"],
-            r["employee_name"] or "",
-            r["remarks"] or ""
+            str(r["date_created"] or ""),
+            str(r["item_name"] or ""),
+            str(r["category"] or ""),
+            str(r["branch"] or ""),
+            str(r["transaction_type"] or ""),
+            str(r["quantity"] or ""),
+            str(r["employee_name"] or "N/A"),
+            str(r["remarks"] or "")
         ])
 
-    table = Table(table_data, repeatRows=1)
+    if len(table_data) == 1:
+        table_data.append(["No transactions found", "", "", "", "", "", "", ""])
+
+    table = Table(
+        table_data,
+        repeatRows=1,
+        colWidths=[70, 80, 70, 55, 55, 35, 70, 85]
+    )
 
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), colors.grey),
-        ("TEXTCOLOR", (0,0), (-1,0), colors.white),
-        ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-        ("FONTSIZE", (0,0), (-1,-1), 8),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#123b7a")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 8),
+
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 1), (-1, -1), 7),
+        ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#1f2937")),
+
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [
+            colors.white,
+            colors.HexColor("#f8fafc")
+        ]),
+
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (5, 1), (5, -1), "CENTER"),
+
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
 
     elements.append(table)
+    elements.append(Spacer(1, 18))
+    elements.append(Paragraph(
+        "Prepared by: ICMPC Inventory Management System",
+        normal_style
+    ))
 
     doc.build(elements)
-
     buffer.seek(0)
 
     return send_file(
         buffer,
         as_attachment=True,
-        download_name="Transactions_Report.pdf",
+        download_name="ICMPC_Professional_Transaction_Report.pdf",
         mimetype="application/pdf"
     )
 
