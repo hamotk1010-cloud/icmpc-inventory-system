@@ -87,12 +87,17 @@ def init_db():
             )
         """)
 
-        # SAFE MIGRATION FOR POSTGRES + SQLITE
-    try:
-        cur.execute("ALTER TABLE suppliers ADD COLUMN category TEXT")
-        conn.commit()   # ✅ VERY IMPORTANT FOR POSTGRES
-    except Exception:
-        conn.rollback() # ✅ FIXES THE ERROR
+        try:
+            cur.execute("ALTER TABLE suppliers ADD COLUMN category TEXT")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+
+        try:
+            cur.execute("ALTER TABLE suppliers ADD COLUMN contact_person TEXT")
+            conn.commit()
+        except Exception:
+            conn.rollback()
 
         cur.execute("""
             CREATE TABLE IF NOT EXISTS items (
@@ -169,11 +174,17 @@ def init_db():
             )
         """)
 
-        # SAFE MIGRATION: add supplier category column if missing
         try:
             cur.execute("ALTER TABLE suppliers ADD COLUMN category TEXT")
+            conn.commit()
         except Exception:
-            pass
+            conn.rollback()
+
+        try:
+            cur.execute("ALTER TABLE suppliers ADD COLUMN contact_person TEXT")
+            conn.commit()
+        except Exception:
+            conn.rollback()
 
         cur.execute("""
             CREATE TABLE IF NOT EXISTS items (
@@ -511,8 +522,8 @@ def suppliers():
     if request.method == "POST":
         execute(conn, """
             INSERT INTO suppliers 
-            (name, email, phone, address, tin, vat_type, business_type, category, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (name, email, phone, address, tin, vat_type, business_type, contact_person, category, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             request.form.get("name"),
             request.form.get("email"),
@@ -521,6 +532,7 @@ def suppliers():
             request.form.get("tin"),
             request.form.get("vat_type"),
             request.form.get("business_type"),
+            request.form.get("contact_person"),
             request.form.get("category"),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
@@ -1307,7 +1319,6 @@ def edit_supplier(supplier_id):
         return check
 
     if session.get("role") != "admin":
-        flash("Admin access only.", "danger")
         return redirect(url_for("suppliers"))
 
     conn = get_db_connection()
@@ -1315,7 +1326,7 @@ def edit_supplier(supplier_id):
     if request.method == "POST":
         execute(conn, """
             UPDATE suppliers
-            SET name = ?, email = ?, phone = ?, address = ?, tin = ?, vat_type = ?, business_type = ?, category = ?
+            SET name = ?, email = ?, phone = ?, address = ?, tin = ?, vat_type = ?, business_type = ?, contact_person = ?, category = ?
             WHERE id = ?
         """, (
             request.form.get("name"),
@@ -1325,6 +1336,7 @@ def edit_supplier(supplier_id):
             request.form.get("tin"),
             request.form.get("vat_type"),
             request.form.get("business_type"),
+            request.form.get("contact_person"),
             request.form.get("category"),
             supplier_id
         ))

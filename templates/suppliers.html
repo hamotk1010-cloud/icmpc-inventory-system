@@ -8,8 +8,13 @@
 
     <form method="POST" class="form-grid">
         <input name="name" placeholder="Supplier Name" required>
+
+        <input name="contact_person" placeholder="Contact Person">
+
         <input name="email" type="email" placeholder="Email">
+
         <input name="phone" placeholder="Phone">
+
         <input name="tin" placeholder="TIN">
 
         <select name="vat_type">
@@ -49,6 +54,7 @@
         <thead>
             <tr>
                 <th>Name</th>
+                <th>Contact Person</th>
                 <th>Email</th>
                 <th>Phone</th>
                 <th>TIN</th>
@@ -63,6 +69,7 @@
         {% for s in suppliers %}
             <tr>
                 <td>{{ s.name }}</td>
+                <td>{{ s.contact_person or "N/A" }}</td>
                 <td>{{ s.email or "N/A" }}</td>
                 <td>{{ s.phone or "N/A" }}</td>
                 <td>{{ s.tin or "N/A" }}</td>
@@ -76,20 +83,20 @@
                     {% endif %}
                 </td>
                 <td>
-    {% if session.get("role") == "admin" %}
-        <a href="{{ url_for('edit_supplier', supplier_id=s.id) }}" class="btn-small">✏️ Edit</a>
+                    {% if session.get("role") == "admin" %}
+                        <a href="{{ url_for('edit_supplier', supplier_id=s.id) }}" class="btn-small">✏️ Edit</a>
 
-        <form method="POST" action="{{ url_for('delete_supplier', supplier_id=s.id) }}" style="display:inline;">
-            <button type="submit" class="btn-small" onclick="return confirm('Delete this supplier?')">
-                🗑 Delete
-            </button>
-        </form>
-    {% endif %}
-</td>
+                        <form method="POST" action="{{ url_for('delete_supplier', supplier_id=s.id) }}" style="display:inline;">
+                            <button type="submit" class="btn-small" onclick="return confirm('Delete this supplier?')">
+                                🗑 Delete
+                            </button>
+                        </form>
+                    {% endif %}
+                </td>
             </tr>
         {% else %}
             <tr>
-                <td colspan="8">No suppliers yet.</td>
+                <td colspan="9">No suppliers yet.</td>
             </tr>
         {% endfor %}
         </tbody>

@@ -16,6 +16,8 @@
     <form method="POST" class="form-grid">
         <input name="name" value="{{ supplier.name or '' }}" placeholder="Supplier Name" required>
 
+        <input name="contact_person" value="{{ supplier.contact_person or '' }}" placeholder="Contact Person">
+
         <input name="email" value="{{ supplier.email or '' }}" placeholder="Email">
 
         <input name="phone" value="{{ supplier.phone or '' }}" placeholder="Phone">
