@@ -914,67 +914,79 @@ def purchase_orders():
     conn = get_db_connection()
 
     if request.method == "POST":
-        po_number = "PO-" + datetime.now().strftime("%Y%m%d%H%M%S")
+        po_number = request.form.get("po_number")
         supplier_id = request.form.get("supplier_id") or None
         po_date = request.form.get("po_date") or datetime.now().strftime("%Y-%m-%d")
         requested_by = request.form.get("requested_by")
         notes = request.form.get("notes")
 
-        if using_postgres():
-            cur = execute(conn, """
-                INSERT INTO purchase_orders
-                (po_number, supplier_id, po_date, requested_by, status, notes, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                RETURNING id
-            """, (
-                po_number,
-                supplier_id,
-                po_date,
-                requested_by,
-                "Pending",
-                notes,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ))
-            po_id = cur.fetchone()["id"]
-        else:
-            cur = execute(conn, """
-                INSERT INTO purchase_orders
-                (po_number, supplier_id, po_date, requested_by, status, notes, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                po_number,
-                supplier_id,
-                po_date,
-                requested_by,
-                "Pending",
-                notes,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ))
-            po_id = cur.lastrowid
+        if not po_number:
+            flash("PO Number is required.", "danger")
+            conn.close()
+            return redirect(url_for("purchase_orders"))
 
-        descriptions = request.form.getlist("description[]")
-        quantities = request.form.getlist("po_quantity[]")
-        units = request.form.getlist("po_unit[]")
-        prices = request.form.getlist("unit_price[]")
-
-        for desc, qty, unit, price in zip(descriptions, quantities, units, prices):
-            if desc and desc.strip():
-                execute(conn, """
-                    INSERT INTO purchase_order_items
-                    (po_id, item_description, quantity, unit, unit_price)
-                    VALUES (?, ?, ?, ?, ?)
+        try:
+            if using_postgres():
+                cur = execute(conn, """
+                    INSERT INTO purchase_orders
+                    (po_number, supplier_id, po_date, requested_by, status, notes, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    RETURNING id
                 """, (
-                    po_id,
-                    desc.strip(),
-                    int(qty or 0),
-                    unit,
-                    float(price or 0)
+                    po_number,
+                    supplier_id,
+                    po_date,
+                    requested_by,
+                    "Pending",
+                    notes,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 ))
+                po_id = cur.fetchone()["id"]
+            else:
+                cur = execute(conn, """
+                    INSERT INTO purchase_orders
+                    (po_number, supplier_id, po_date, requested_by, status, notes, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    po_number,
+                    supplier_id,
+                    po_date,
+                    requested_by,
+                    "Pending",
+                    notes,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ))
+                po_id = cur.lastrowid
 
-        conn.commit()
-        conn.close()
+            descriptions = request.form.getlist("description[]")
+            quantities = request.form.getlist("po_quantity[]")
+            units = request.form.getlist("po_unit[]")
+            prices = request.form.getlist("unit_price[]")
 
-        flash("Purchase order created successfully.", "success")
+            for desc, qty, unit, price in zip(descriptions, quantities, units, prices):
+                if desc and desc.strip():
+                    execute(conn, """
+                        INSERT INTO purchase_order_items
+                        (po_id, item_description, quantity, unit, unit_price)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        po_id,
+                        desc.strip(),
+                        int(qty or 0),
+                        unit,
+                        float(price or 0)
+                    ))
+
+            conn.commit()
+            flash("Purchase order created successfully.", "success")
+
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error creating purchase order: {e}", "danger")
+
+        finally:
+            conn.close()
+
         return redirect(url_for("purchase_orders"))
 
     po_list = fetchall(conn, """
@@ -988,6 +1000,34 @@ def purchase_orders():
     conn.close()
 
     return render_template("purchase_orders.html", purchase_orders=po_list, suppliers=supplier_list)
+
+@app.route("/purchase-orders/delete/<int:po_id>", methods=["POST"])
+def delete_purchase_order(po_id):
+    check = require_login()
+    if check:
+        return check
+
+    if session.get("role") != "admin":
+        flash("Admin access only.", "danger")
+        return redirect(url_for("purchase_orders"))
+
+    conn = get_db_connection()
+
+    try:
+        execute(conn, "DELETE FROM purchase_order_items WHERE po_id = ?", (po_id,))
+        execute(conn, "DELETE FROM purchase_orders WHERE id = ?", (po_id,))
+
+        conn.commit()
+        flash("Purchase order deleted successfully.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error deleting purchase order: {e}", "danger")
+
+    finally:
+        conn.close()
+
+    return redirect(url_for("purchase_orders"))
 
 @app.route("/purchase-orders/add", methods=["GET", "POST"])
 def add_purchase_order():
