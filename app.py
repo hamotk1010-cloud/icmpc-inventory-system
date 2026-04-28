@@ -1275,10 +1275,6 @@ def export_assignments_pdf():
         mimetype="application/pdf"
     )
 
-@app.route("/health")
-def health():
-    return "OK - ICMPC Inventory System is running"
-
 @app.route("/items/edit/<int:item_id>", methods=["GET", "POST"])
 def edit_item(item_id):
     if session.get("role") != "admin":
@@ -1351,6 +1347,19 @@ def edit_supplier(supplier_id):
     conn.close()
 
     return render_template("edit_supplier.html", supplier=supplier)
+
+@app.route("/employees")
+def employees():
+    check = require_login()
+    if check:
+        return check
+
+    return render_template("employees.html")
+
+
+@app.route("/health")
+def health():
+    return "OK - ICMPC Inventory System is running"
 
 
 init_db()

@@ -48,6 +48,10 @@
         <i class="fa-solid fa-chart-pie"></i> Reports
     </a>
 
+    <a href="{{ url_for('employees') }}">
+        <i class="fa-solid fa-user-tie"></i> Employees
+    </a>
+
     {% if session.get("role") == "admin" %}
     <a href="{{ url_for('users') }}">
         <i class="fa-solid fa-users"></i> User Roles

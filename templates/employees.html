@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Employees</h1>
+
+<section class="panel">
+    <div class="panel-head">
+        <div>
+            <h2>Employee Records</h2>
+            <p style="color:#64748b; margin-top:-8px;">
+                This page is ready for employee equipment assignment and monitoring.
+            </p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Employee Name</th>
+                <th>Position</th>
+                <th>Branch</th>
+                <th>Assigned Equipment</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            <tr>
+                <td colspan="5">No employees added yet.</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+{% endblock %}
