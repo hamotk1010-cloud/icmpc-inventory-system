@@ -148,6 +148,41 @@ def init_db():
                 unit_price NUMERIC DEFAULT 0
             )
         """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id SERIAL PRIMARY KEY,
+                user_name TEXT,
+                action TEXT NOT NULL,
+                details TEXT,
+                date_created TEXT NOT NULL
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS equipment_assignments (
+                id SERIAL PRIMARY KEY,
+                employee_name TEXT NOT NULL,
+                position TEXT,
+                branch TEXT,
+                item_id INTEGER REFERENCES items(id),
+                quantity INTEGER NOT NULL DEFAULT 1,
+                remarks TEXT,
+                assigned_by TEXT,
+                date_assigned TEXT NOT NULL
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS employees (
+                id SERIAL PRIMARY KEY,
+                employee_name TEXT NOT NULL,
+                position TEXT,
+                branch TEXT,
+                date_created TEXT
+            )
+        """)
+
     else:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -240,32 +275,6 @@ def init_db():
             )
         """)
 
-    # Audit logs and equipment assignments
-    if using_postgres():
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS audit_logs (
-                id SERIAL PRIMARY KEY,
-                user_name TEXT,
-                action TEXT NOT NULL,
-                details TEXT,
-                date_created TEXT NOT NULL
-            )
-        """)
-
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS equipment_assignments (
-                id SERIAL PRIMARY KEY,
-                employee_name TEXT NOT NULL,
-                position TEXT,
-                branch TEXT,
-                item_id INTEGER REFERENCES items(id),
-                quantity INTEGER NOT NULL DEFAULT 1,
-                remarks TEXT,
-                assigned_by TEXT,
-                date_assigned TEXT NOT NULL
-            )
-        """)
-    else:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS audit_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -288,6 +297,16 @@ def init_db():
                 assigned_by TEXT,
                 date_assigned TEXT NOT NULL,
                 FOREIGN KEY (item_id) REFERENCES items(id)
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS employees (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_name TEXT NOT NULL,
+                position TEXT,
+                branch TEXT,
+                date_created TEXT
             )
         """)
 
@@ -1348,13 +1367,42 @@ def edit_supplier(supplier_id):
 
     return render_template("edit_supplier.html", supplier=supplier)
 
-@app.route("/employees")
+@app.route("/employees", methods=["GET", "POST"])
 def employees():
     check = require_login()
     if check:
         return check
 
-    return render_template("employees.html")
+    conn = get_db_connection()
+
+    # =============================
+    # ADD EMPLOYEE (ADMIN ONLY)
+    # =============================
+    if request.method == "POST":
+        if session.get("role") != "admin":
+            flash("Admin only.", "danger")
+            return redirect(url_for("employees"))
+
+        execute(conn, """
+            INSERT INTO employees (employee_name, position, branch, date_created)
+            VALUES (?, ?, ?, ?)
+        """, (
+            request.form.get("employee_name"),
+            request.form.get("position"),
+            request.form.get("branch") or session.get("branch"),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+
+        conn.commit()
+        conn.close()
+
+        flash("Employee added successfully.", "success")
+        return redirect(url_for("employees"))
+
+    employee_list = fetchall(conn, "SELECT * FROM employees ORDER BY employee_name ASC")
+    conn.close()
+
+    return render_template("employees.html", employees=employee_list)
 
 
 @app.route("/health")
