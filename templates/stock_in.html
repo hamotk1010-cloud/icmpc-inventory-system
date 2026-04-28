@@ -1,24 +1,52 @@
 {% extends "base.html" %}
 {% block content %}
+
 <h1>Stock In</h1>
 
-<section class="panel small-panel">
-    <form method="POST">
-        <label>Select Item</label>
-        <select name="item_id" required>
-            <option value="">Choose item</option>
+<section class="panel">
+    <h2>Add Stock</h2>
+
+    <form method="POST" class="form-grid">
+        <select name="item_id" id="itemSelect" required onchange="fillItemDetails()">
+            <option value="">Select Item</option>
             {% for item in items %}
-            <option value="{{ item.id }}">{{ item.item_name }} — Current: {{ item.quantity }}</option>
+            <option
+                value="{{ item.id }}"
+                data-category="{{ item.category or '' }}"
+                data-unit="{{ item.unit or '' }}"
+                data-quantity="{{ item.quantity or 0 }}"
+                data-branch="{{ item.branch or '' }}"
+                data-supplier="{{ item.supplier_name or 'N/A' }}">
+                {{ item.item_name }}
+            </option>
             {% endfor %}
         </select>
 
-        <label>Quantity to Add</label>
-        <input type="number" name="quantity" required>
+        <input id="categoryBox" placeholder="Category" readonly>
+        <input id="unitBox" placeholder="Unit" readonly>
+        <input id="currentStockBox" placeholder="Current Stock" readonly>
+        <input id="branchBox" placeholder="Branch" readonly>
+        <input id="supplierBox" placeholder="Supplier" readonly>
 
-        <label>Remarks</label>
-        <input name="remarks" placeholder="Delivery, purchase, return, etc.">
+        <input name="quantity" type="number" placeholder="Quantity to Add" min="1" required>
 
-        <button type="submit">Add Stock</button>
+        <textarea name="remarks" placeholder="Remarks"></textarea>
+
+        <button type="submit">Save Stock In</button>
     </form>
 </section>
+
+<script>
+function fillItemDetails() {
+    const select = document.getElementById("itemSelect");
+    const option = select.options[select.selectedIndex];
+
+    document.getElementById("categoryBox").value = option.getAttribute("data-category") || "";
+    document.getElementById("unitBox").value = option.getAttribute("data-unit") || "";
+    document.getElementById("currentStockBox").value = option.getAttribute("data-quantity") || "";
+    document.getElementById("branchBox").value = option.getAttribute("data-branch") || "";
+    document.getElementById("supplierBox").value = option.getAttribute("data-supplier") || "";
+}
+</script>
+
 {% endblock %}

@@ -318,6 +318,13 @@ def init_db():
         VALUES (?, ?, ?, ?, ?)
     """), ("Administrator", "admin", "admin123", "admin", "Head Office"))
 
+        # SAFE MIGRATION: add employee_id to stock transactions if missing
+    try:
+        cur.execute("ALTER TABLE stock_transactions ADD COLUMN employee_id INTEGER")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+
     conn.commit()
     conn.close()
 
@@ -742,6 +749,7 @@ def stock_in():
             return redirect(url_for("stock_in"))
 
         execute(conn, "UPDATE items SET quantity = quantity + ? WHERE id = ?", (quantity, item_id))
+
         execute(conn, """
             INSERT INTO stock_transactions
             (item_id, transaction_type, quantity, remarks, encoded_by, date_created)
@@ -762,7 +770,15 @@ def stock_in():
         return redirect(url_for("stock_in"))
 
     where_sql, params = branch_where("items")
-    item_list = fetchall(conn, f"SELECT * FROM items {where_sql} ORDER BY item_name ASC", params)
+
+    item_list = fetchall(conn, f"""
+        SELECT items.*, suppliers.name AS supplier_name
+        FROM items
+        LEFT JOIN suppliers ON suppliers.id = items.supplier_id
+        {where_sql}
+        ORDER BY items.item_name ASC
+    """, params)
+
     conn.close()
     return render_template("stock_in.html", items=item_list)
 
@@ -778,6 +794,7 @@ def stock_out():
     if request.method == "POST":
         item_id = int(request.form.get("item_id"))
         quantity = int(request.form.get("quantity") or 0)
+        employee_id = request.form.get("employee_id") or None
         remarks = request.form.get("remarks")
 
         item = fetchone(conn, "SELECT * FROM items WHERE id = ?", (item_id,))
@@ -793,16 +810,18 @@ def stock_out():
             return redirect(url_for("stock_out"))
 
         execute(conn, "UPDATE items SET quantity = quantity - ? WHERE id = ?", (quantity, item_id))
+
         execute(conn, """
             INSERT INTO stock_transactions
-            (item_id, transaction_type, quantity, remarks, encoded_by, date_created)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (item_id, transaction_type, quantity, remarks, encoded_by, employee_id, date_created)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             item_id,
             "Stock Out",
             quantity,
             remarks,
             session.get("full_name"),
+            employee_id,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
 
@@ -813,9 +832,19 @@ def stock_out():
         return redirect(url_for("stock_out"))
 
     where_sql, params = branch_where("items")
-    item_list = fetchall(conn, f"SELECT * FROM items {where_sql} ORDER BY item_name ASC", params)
+
+    item_list = fetchall(conn, f"""
+        SELECT items.*, suppliers.name AS supplier_name
+        FROM items
+        LEFT JOIN suppliers ON suppliers.id = items.supplier_id
+        {where_sql}
+        ORDER BY items.item_name ASC
+    """, params)
+
+    employee_list = fetchall(conn, "SELECT * FROM employees ORDER BY employee_name ASC")
+
     conn.close()
-    return render_template("stock_out.html", items=item_list)
+    return render_template("stock_out.html", items=item_list, employees=employee_list)
 
 
 @app.route("/transactions")
@@ -825,15 +854,50 @@ def transactions():
         return check
 
     conn = get_db_connection()
-    rows = fetchall(conn, """
-        SELECT stock_transactions.*, items.item_name, items.branch
+
+    date_from = request.args.get("date_from", "")
+    date_to = request.args.get("date_to", "")
+    category = request.args.get("category", "")
+
+    query = """
+        SELECT stock_transactions.*, 
+               items.item_name, 
+               items.category,
+               items.unit,
+               items.branch,
+               employees.employee_name
         FROM stock_transactions
         JOIN items ON items.id = stock_transactions.item_id
-        ORDER BY stock_transactions.id DESC
-    """)
+        LEFT JOIN employees ON employees.id = stock_transactions.employee_id
+        WHERE 1=1
+    """
+
+    params = []
+
+    if date_from:
+        query += " AND DATE(stock_transactions.date_created) >= ?"
+        params.append(date_from)
+
+    if date_to:
+        query += " AND DATE(stock_transactions.date_created) <= ?"
+        params.append(date_to)
+
+    if category:
+        query += " AND items.category = ?"
+        params.append(category)
+
+    query += " ORDER BY stock_transactions.id DESC"
+
+    rows = fetchall(conn, query, tuple(params))
     conn.close()
 
-    return render_template("transactions.html", transactions=rows)
+    return render_template(
+        "transactions.html",
+        transactions=rows,
+        date_from=date_from,
+        date_to=date_to,
+        category=category
+    )
 
 
 @app.route("/purchase-orders", methods=["GET", "POST"])

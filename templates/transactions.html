@@ -1,30 +1,81 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="panel-head">
-    <h1>Transactions</h1>
-    <a href="{{ url_for('export_transactions') }}" class="btn-link">Export Excel</a>
-</div>
+
+<h1>Transactions</h1>
 
 <section class="panel">
+    <h2>Filter Transactions</h2>
+
+    <form method="GET" class="form-grid">
+        <input type="date" name="date_from" value="{{ date_from }}">
+
+        <input type="date" name="date_to" value="{{ date_to }}">
+
+        <select name="category">
+            <option value="">All Categories</option>
+            <option value="Office Supplies" {% if category == "Office Supplies" %}selected{% endif %}>Office Supplies</option>
+            <option value="Furniture and Fixtures" {% if category == "Furniture and Fixtures" %}selected{% endif %}>Furniture and Fixtures</option>
+            <option value="Equipment" {% if category == "Equipment" %}selected{% endif %}>Equipment</option>
+            <option value="Expenses" {% if category == "Expenses" %}selected{% endif %}>Expenses</option>
+            <option value="Food" {% if category == "Food" %}selected{% endif %}>Food</option>
+            <option value="Services" {% if category == "Services" %}selected{% endif %}>Services</option>
+        </select>
+
+        <button type="submit">Filter</button>
+
+        <a href="{{ url_for('transactions') }}" class="btn-link">Clear Filter</a>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Transaction History</h2>
+        <a href="{{ url_for('export_transactions') }}" class="btn-link">Export Excel</a>
+    </div>
+
     <table>
         <thead>
-            <tr><th>Date</th><th>Item</th><th>Branch</th><th>Type</th><th>Qty</th><th>Remarks</th><th>Encoded By</th></tr>
+            <tr>
+                <th>Date</th>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Unit</th>
+                <th>Branch</th>
+                <th>Type</th>
+                <th>Quantity</th>
+                <th>Given To</th>
+                <th>Remarks</th>
+                <th>Encoded By</th>
+            </tr>
         </thead>
+
         <tbody>
         {% for t in transactions %}
             <tr>
                 <td>{{ t.date_created }}</td>
                 <td>{{ t.item_name }}</td>
-                <td>{{ t.branch }}</td>
-                <td>{{ t.transaction_type }}</td>
+                <td>{{ t.category or "N/A" }}</td>
+                <td>{{ t.unit or "N/A" }}</td>
+                <td>{{ t.branch or "N/A" }}</td>
+                <td>
+                    {% if t.transaction_type == "Stock In" %}
+                        <span class="badge">{{ t.transaction_type }}</span>
+                    {% else %}
+                        <span class="badge">{{ t.transaction_type }}</span>
+                    {% endif %}
+                </td>
                 <td>{{ t.quantity }}</td>
-                <td>{{ t.remarks }}</td>
-                <td>{{ t.encoded_by }}</td>
+                <td>{{ t.employee_name or "N/A" }}</td>
+                <td>{{ t.remarks or "N/A" }}</td>
+                <td>{{ t.encoded_by or "N/A" }}</td>
             </tr>
         {% else %}
-            <tr><td colspan="7">No transactions yet.</td></tr>
+            <tr>
+                <td colspan="10">No transactions found.</td>
+            </tr>
         {% endfor %}
         </tbody>
     </table>
 </section>
+
 {% endblock %}
