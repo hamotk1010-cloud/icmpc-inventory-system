@@ -4,7 +4,7 @@
 <h1>Create Purchase Order</h1>
 
 <section class="panel">
-    <form method="POST">
+    <form method="POST" action="{{ url_for('add_purchase_order') }}">
 
         <div class="form-grid">
             <input name="po_number" placeholder="PO Number" required>
