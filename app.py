@@ -1404,6 +1404,68 @@ def employees():
 
     return render_template("employees.html", employees=employee_list)
 
+# =============================
+# EDIT EMPLOYEE
+# =============================
+@app.route("/employees/edit/<int:employee_id>", methods=["GET", "POST"])
+def edit_employee(employee_id):
+    check = require_login()
+    if check:
+        return check
+
+    if session.get("role") != "admin":
+        flash("Admin only.", "danger")
+        return redirect(url_for("employees"))
+
+    conn = get_db_connection()
+
+    if request.method == "POST":
+        execute(conn, """
+            UPDATE employees
+            SET employee_name = ?, position = ?, branch = ?
+            WHERE id = ?
+        """, (
+            request.form.get("employee_name"),
+            request.form.get("position"),
+            request.form.get("branch"),
+            employee_id
+        ))
+
+        conn.commit()
+        conn.close()
+
+        flash("Employee updated successfully.", "success")
+        return redirect(url_for("employees"))
+
+    emp = fetchone(conn, "SELECT * FROM employees WHERE id = ?", (employee_id,))
+    conn.close()
+
+    return render_template("edit_employee.html", emp=emp)
+
+
+# =============================
+# DELETE EMPLOYEE
+# =============================
+@app.route("/employees/delete/<int:employee_id>", methods=["POST"])
+def delete_employee(employee_id):
+    check = require_login()
+    if check:
+        return check
+
+    if session.get("role") != "admin":
+        flash("Admin only.", "danger")
+        return redirect(url_for("employees"))
+
+    conn = get_db_connection()
+
+    execute(conn, "DELETE FROM employees WHERE id = ?", (employee_id,))
+
+    conn.commit()
+    conn.close()
+
+    flash("Employee deleted successfully.", "success")
+    return redirect(url_for("employees"))
+
 
 @app.route("/health")
 def health():

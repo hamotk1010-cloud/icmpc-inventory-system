@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Edit Employee</h1>
+
+<section class="panel">
+    <form method="POST" class="form-grid">
+
+        <input name="employee_name" value="{{ emp.employee_name }}" required>
+
+        <input name="position" value="{{ emp.position or '' }}" placeholder="Position">
+
+        <input name="branch" value="{{ emp.branch or '' }}" placeholder="Branch">
+
+        <button type="submit">Update Employee</button>
+    </form>
+</section>
+
+{% endblock %}
