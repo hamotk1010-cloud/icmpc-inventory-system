@@ -7,24 +7,31 @@
 
     <form method="POST" class="form-grid">
         <input name="item_name" placeholder="Item Name" required>
-        <select name="category" required>
-    <option value="">Select Category</option>
-    <option value="Office Supplies">Office Supplies</option>
-    <option value="Furniture and Fixtures">Furniture and Fixtures</option>
-    <option value="Equipment">Equipment</option>
-    <option value="Expenses">Expenses</option>
-    <option value="Food">Food</option>
-    <option value="Services">Services</option>
-</select>
+
+        <select name="category" id="itemCategory" required onchange="filterSuppliersByCategory()">
+            <option value="">Select Category</option>
+            <option value="Office Supplies">Office Supplies</option>
+            <option value="Furniture and Fixtures">Furniture and Fixtures</option>
+            <option value="Equipment">Equipment</option>
+            <option value="Expenses">Expenses</option>
+            <option value="Food">Food</option>
+            <option value="Services">Services</option>
+        </select>
+
         <input name="unit" placeholder="Unit / pcs / box">
+
         <input name="quantity" type="number" placeholder="Beginning Quantity" value="0" required>
+
         <input name="low_stock_limit" type="number" placeholder="Low Stock Limit" value="5" required>
+
         <input name="branch" placeholder="Branch e.g. Head Office" value="{{ session.get('branch') or '' }}">
 
-        <select name="supplier_id">
-            <option value="">No Supplier</option>
+        <select name="supplier_id" id="supplierDropdown">
+            <option value="">Select Supplier</option>
             {% for s in suppliers %}
-            <option value="{{ s.id }}">{{ s.name }}</option>
+            <option value="{{ s.id }}" data-category="{{ s.category or '' }}">
+                {{ s.name }} {% if s.category %}— {{ s.category }}{% endif %}
+            </option>
             {% endfor %}
         </select>
 
@@ -35,47 +42,46 @@
 <section class="panel">
     <div class="panel-head">
         <h2>Inventory List</h2>
-        <a href="{{ url_for('export_items', 
-    search=request.args.get('search'), 
-    category=request.args.get('category')) }}" 
-class="btn-link">
-    📥 Export Excel
-</a>
+
+        <a href="{{ url_for('export_items',
+            search=request.args.get('search'),
+            category=request.args.get('category')) }}"
+           class="btn-link">
+            Export Excel
+        </a>
     </div>
 
-<form method="GET" class="form-grid" style="margin-bottom:15px;">
+    <form method="GET" class="form-grid" style="margin-bottom:15px;">
+        <input type="text" name="search" placeholder="Search item..."
+               value="{{ request.args.get('search', '') }}">
 
-    <input type="text" name="search" placeholder="Search item..."
-           value="{{ request.args.get('search', '') }}">
+        <select name="category">
+            <option value="">All Categories</option>
+            <option value="Office Supplies" {% if request.args.get('category') == "Office Supplies" %}selected{% endif %}>Office Supplies</option>
+            <option value="Furniture and Fixtures" {% if request.args.get('category') == "Furniture and Fixtures" %}selected{% endif %}>Furniture and Fixtures</option>
+            <option value="Equipment" {% if request.args.get('category') == "Equipment" %}selected{% endif %}>Equipment</option>
+            <option value="Expenses" {% if request.args.get('category') == "Expenses" %}selected{% endif %}>Expenses</option>
+            <option value="Food" {% if request.args.get('category') == "Food" %}selected{% endif %}>Food</option>
+            <option value="Services" {% if request.args.get('category') == "Services" %}selected{% endif %}>Services</option>
+        </select>
 
-    <select name="category">
-        <option value="">All Categories</option>
-        <option value="Office Supplies">Office Supplies</option>
-        <option value="Furniture and Fixtures">Furniture and Fixtures</option>
-        <option value="Equipment">Equipment</option>
-        <option value="Expenses">Expenses</option>
-        <option value="Food">Food</option>
-        <option value="Services">Services</option>
-    </select>
-
-    <button type="submit">Filter</button>
-
-</form>
-
+        <button type="submit">Filter</button>
+    </form>
 
     <table>
         <thead>
             <tr>
-    <th>Item</th>
-    <th>Category</th>
-    <th>Unit</th>
-    <th>Qty</th>
-    <th>Limit</th>
-    <th>Branch</th>
-    <th>Supplier</th>
-    <th>Actions</th>
-</tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Unit</th>
+                <th>Qty</th>
+                <th>Limit</th>
+                <th>Branch</th>
+                <th>Supplier</th>
+                <th>Actions</th>
+            </tr>
         </thead>
+
         <tbody>
         {% for item in items %}
             <tr>
@@ -87,10 +93,10 @@ class="btn-link">
                 <td>{{ item.branch }}</td>
                 <td>{{ item.supplier_name or "N/A" }}</td>
                 <td>
-    {% if session.get("role") == "admin" %}
-    <a href="{{ url_for('edit_item', item_id=item.id) }}" class="btn-small">Edit</a>
-    {% endif %}
-</td>
+                    {% if session.get("role") == "admin" %}
+                    <a href="{{ url_for('edit_item', item_id=item.id) }}" class="btn-small">✏️ Edit</a>
+                    {% endif %}
+                </td>
             </tr>
         {% else %}
             <tr><td colspan="8">No items yet.</td></tr>
@@ -98,4 +104,31 @@ class="btn-link">
         </tbody>
     </table>
 </section>
+
+<script>
+function filterSuppliersByCategory() {
+    const selectedCategory = document.getElementById("itemCategory").value;
+    const supplierDropdown = document.getElementById("supplierDropdown");
+    const options = supplierDropdown.querySelectorAll("option");
+
+    supplierDropdown.value = "";
+
+    options.forEach(option => {
+        const supplierCategory = option.getAttribute("data-category");
+
+        if (option.value === "") {
+            option.style.display = "block";
+            option.textContent = selectedCategory ? "Select Supplier" : "Select Supplier";
+            return;
+        }
+
+        if (selectedCategory === "" || supplierCategory === selectedCategory) {
+            option.style.display = "block";
+        } else {
+            option.style.display = "none";
+        }
+    });
+}
+</script>
+
 {% endblock %}

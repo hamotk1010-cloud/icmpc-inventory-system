@@ -545,9 +545,7 @@ def items():
 
     conn = get_db_connection()
 
-    # =============================
     # ADD ITEM
-    # =============================
     if request.method == "POST":
         execute(conn, """
             INSERT INTO items
@@ -569,9 +567,7 @@ def items():
         flash("Item added successfully.", "success")
         return redirect(url_for("items"))
 
-    # =============================
-    # FILTER LOGIC (FIXED)
-    # =============================
+    # FILTER
     search = request.args.get("search", "")
     category = request.args.get("category", "")
 
@@ -584,20 +580,10 @@ def items():
 
     params = []
 
-    # branch filter
-    role = session.get("role")
-    branch = session.get("branch")
-
-    if role == "branch_manager" and branch:
-        query += " AND items.branch = ?"
-        params.append(branch)
-
-    # search filter
     if search:
         query += " AND items.item_name LIKE ?"
         params.append(f"%{search}%")
 
-    # category filter
     if category:
         query += " AND items.category = ?"
         params.append(category)
@@ -606,7 +592,9 @@ def items():
 
     item_list = fetchall(conn, query, tuple(params))
 
+    # ✅ IMPORTANT: GET ALL SUPPLIERS (WITH CATEGORY)
     supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
+
     conn.close()
 
     return render_template(
