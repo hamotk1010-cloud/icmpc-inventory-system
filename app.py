@@ -87,11 +87,12 @@ def init_db():
             )
         """)
 
-        # SAFE MIGRATION: add supplier category column if missing
-        try:
-            cur.execute("ALTER TABLE suppliers ADD COLUMN category TEXT")
-        except Exception:
-            pass
+        # SAFE MIGRATION FOR POSTGRES + SQLITE
+    try:
+        cur.execute("ALTER TABLE suppliers ADD COLUMN category TEXT")
+        conn.commit()   # ✅ VERY IMPORTANT FOR POSTGRES
+    except Exception:
+        conn.rollback() # ✅ FIXES THE ERROR
 
         cur.execute("""
             CREATE TABLE IF NOT EXISTS items (
