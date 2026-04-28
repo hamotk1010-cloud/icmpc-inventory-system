@@ -531,6 +531,9 @@ def items():
 
     conn = get_db_connection()
 
+    # =============================
+    # ADD ITEM
+    # =============================
     if request.method == "POST":
         execute(conn, """
             INSERT INTO items
@@ -552,30 +555,42 @@ def items():
         flash("Item added successfully.", "success")
         return redirect(url_for("items"))
 
-    # ✅ FILTER LOGIC
+    # =============================
+    # FILTER LOGIC (FIXED)
+    # =============================
     search = request.args.get("search", "")
     category = request.args.get("category", "")
 
-    where_sql, params = branch_where("items")
-
-    query = f"""
+    query = """
         SELECT items.*, suppliers.name AS supplier_name
         FROM items
         LEFT JOIN suppliers ON suppliers.id = items.supplier_id
-        {where_sql}
+        WHERE 1=1
     """
 
+    params = []
+
+    # branch filter
+    role = session.get("role")
+    branch = session.get("branch")
+
+    if role == "branch_manager" and branch:
+        query += " AND items.branch = ?"
+        params.append(branch)
+
+    # search filter
     if search:
-        query += " AND item_name LIKE ?"
+        query += " AND items.item_name LIKE ?"
         params.append(f"%{search}%")
 
+    # category filter
     if category:
-        query += " AND category = ?"
+        query += " AND items.category = ?"
         params.append(category)
 
     query += " ORDER BY items.item_name ASC"
 
-    item_list = fetchall(conn, query, params)
+    item_list = fetchall(conn, query, tuple(params))
 
     supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
     conn.close()

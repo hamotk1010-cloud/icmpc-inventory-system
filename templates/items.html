@@ -42,7 +42,7 @@ class="btn-link">Export Excel</a>
     </div>
 
 <form method="GET" class="form-grid" style="margin-bottom:15px;">
-    
+
     <input type="text" name="search" placeholder="Search item..."
            value="{{ request.args.get('search', '') }}">
 
@@ -59,6 +59,11 @@ class="btn-link">Export Excel</a>
     <button type="submit">Filter</button>
 
 </form>
+
+<a href="{{ url_for('export_items', 
+    search=request.args.get('search'), 
+    category=request.args.get('category')) }}" 
+class="btn-link">Export Excel</a>
 
     <table>
         <thead>
