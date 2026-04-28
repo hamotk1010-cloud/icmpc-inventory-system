@@ -658,16 +658,37 @@ def delete_supplier(supplier_id):
 
     conn = get_db_connection()
 
-    # remove supplier reference from items first
-    execute(conn, "UPDATE items SET supplier_id = NULL WHERE supplier_id = ?", (supplier_id,))
+    try:
+        # Remove supplier reference from items
+        execute(conn, """
+            UPDATE items 
+            SET supplier_id = NULL 
+            WHERE supplier_id = ?
+        """, (supplier_id,))
 
-    # delete supplier
-    execute(conn, "DELETE FROM suppliers WHERE id = ?", (supplier_id,))
+        # Remove supplier reference from purchase orders
+        execute(conn, """
+            UPDATE purchase_orders 
+            SET supplier_id = NULL 
+            WHERE supplier_id = ?
+        """, (supplier_id,))
 
-    conn.commit()
-    conn.close()
+        # Delete supplier
+        execute(conn, """
+            DELETE FROM suppliers 
+            WHERE id = ?
+        """, (supplier_id,))
 
-    flash("Supplier deleted successfully.", "success")
+        conn.commit()
+        flash("Supplier deleted successfully.", "success")
+
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error deleting supplier: {e}", "danger")
+
+    finally:
+        conn.close()
+
     return redirect(url_for("suppliers"))
 
 
