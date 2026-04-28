@@ -22,6 +22,15 @@
             {% endfor %}
         </select>
 
+        <select name="po_id">
+    <option value="">Select Purchase Order (Optional)</option>
+    {% for po in purchase_orders %}
+    <option value="{{ po.id }}">
+        {{ po.po_number }} - {{ po.supplier_name if po.supplier_name else "" }}
+    </option>
+    {% endfor %}
+</select>
+
         <input id="categoryBox" placeholder="Category" readonly>
         <input id="unitBox" placeholder="Unit" readonly>
         <input id="currentStockBox" placeholder="Current Stock" readonly>

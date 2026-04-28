@@ -330,6 +330,15 @@ def init_db():
     except Exception:
         conn.rollback()
 
+    # ============================= 
+    # LINK PO TO STOCK TRANSACTIONS
+    # =============================
+    try:
+        cur.execute("ALTER TABLE stock_transactions ADD COLUMN po_id INTEGER")
+        conn.commit()
+    except:
+        conn.rollback()
+
     conn.commit()
     conn.close()
 
@@ -747,45 +756,59 @@ def stock_in():
         item_id = int(request.form.get("item_id"))
         quantity = int(request.form.get("quantity") or 0)
         remarks = request.form.get("remarks")
+        po_id = request.form.get("po_id") or None
 
         if quantity <= 0:
-            flash("Quantity must be greater than zero.", "danger")
+            flash("Invalid quantity.", "danger")
             conn.close()
             return redirect(url_for("stock_in"))
 
+        # UPDATE STOCK
         execute(conn, "UPDATE items SET quantity = quantity + ? WHERE id = ?", (quantity, item_id))
 
+        # SAVE TRANSACTION
         execute(conn, """
             INSERT INTO stock_transactions
-            (item_id, transaction_type, quantity, remarks, encoded_by, date_created)
-            VALUES (?, ?, ?, ?, ?, ?)
+            (item_id, transaction_type, quantity, remarks, encoded_by, po_id, date_created)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         """, (
             item_id,
             "Stock In",
             quantity,
             remarks,
             session.get("full_name"),
+            po_id,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
+
+        # =============================
+        # AUTO UPDATE PO STATUS
+        # =============================
+        if po_id:
+            execute(conn, """
+                UPDATE purchase_orders
+                SET status = 'Received'
+                WHERE id = ?
+            """, (po_id,))
 
         conn.commit()
         conn.close()
 
-        flash("Stock added successfully.", "success")
+        flash("Stock added and PO updated.", "success")
         return redirect(url_for("stock_in"))
 
-    where_sql, params = branch_where("items")
+    items = fetchall(conn, "SELECT * FROM items ORDER BY item_name ASC")
 
-    item_list = fetchall(conn, f"""
-        SELECT items.*, suppliers.name AS supplier_name
-        FROM items
-        LEFT JOIN suppliers ON suppliers.id = items.supplier_id
-        {where_sql}
-        ORDER BY items.item_name ASC
-    """, params)
+    # ONLY SHOW PENDING PO
+    po_list = fetchall(conn, """
+        SELECT * FROM purchase_orders
+        WHERE status = 'Pending'
+        ORDER BY id DESC
+    """)
 
     conn.close()
-    return render_template("stock_in.html", items=item_list)
+
+    return render_template("stock_in.html", items=items, purchase_orders=po_list)
 
 
 @app.route("/stock-out", methods=["GET", "POST"])
