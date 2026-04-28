@@ -1004,11 +1004,11 @@ def export_items():
     params = []
 
     if search:
-        query += " AND item_name LIKE ?"
+        query += " AND items.item_name LIKE ?"
         params.append(f"%{search}%")
 
     if category:
-        query += " AND category = ?"
+        query += " AND items.category = ?"
         params.append(category)
 
     query += " ORDER BY items.item_name ASC"
