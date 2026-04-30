@@ -6,29 +6,74 @@
 <section class="panel">
     <h2>Create Transmittal</h2>
 
-    <form method="POST" class="form-grid">
-        <input name="transmittal_no" placeholder="Transmittal No." required>
+    <form method="POST">
+        <div class="form-grid">
+            <input name="transmittal_no" placeholder="Transmittal No." required>
 
-        <input name="employee_name" placeholder="Employee Name" required>
+            <select name="employee_id" required>
+                <option value="">Select Employee</option>
+                {% for e in employees %}
+                <option value="{{ e.id }}">
+                    {{ e.employee_name }}{% if e.branch %} - {{ e.branch }}{% endif %}
+                </option>
+                {% endfor %}
+            </select>
 
-        <textarea name="purpose" placeholder="Purpose"></textarea>
+            <textarea name="purpose" placeholder="Purpose / Notes"></textarea>
+        </div>
 
+        <h3 style="margin-top:20px;">Items</h3>
+
+        <table id="transmittalItemsTable">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Quantity</th>
+                    <th>Remarks</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                <tr>
+                    <td>
+                        <select name="item_id[]" required>
+                            <option value="">Select Item</option>
+                            {% for item in items %}
+                            <option value="{{ item.id }}">
+                                {{ item.item_name }} — Available: {{ item.quantity }} {{ item.unit or "" }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td><input name="quantity[]" type="number" min="1" value="1" required></td>
+                    <td><input name="remarks[]" placeholder="Remarks"></td>
+                    <td><button type="button" onclick="removeTransmittalRow(this)">Remove</button></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <br>
+        <button type="button" onclick="addTransmittalRow()">Add Item</button>
         <button type="submit">Create Transmittal</button>
     </form>
 </section>
 
 <section class="panel">
     <div class="panel-head">
-        <h2>Transmittal List</h2>
+        <h2>Transmittal Records</h2>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th>No.</th>
+                <th>Transmittal No.</th>
                 <th>Employee</th>
                 <th>Purpose</th>
+                <th>Status</th>
+                <th>Prepared By</th>
                 <th>Date</th>
+                <th>Actions</th>
             </tr>
         </thead>
 
@@ -36,17 +81,65 @@
         {% for t in transmittals %}
             <tr>
                 <td>{{ t.transmittal_no }}</td>
-                <td>{{ t.employee_name }}</td>
-                <td>{{ t.purpose }}</td>
+                <td>{{ t.employee_name or "N/A" }}</td>
+                <td>{{ t.purpose or "N/A" }}</td>
+                <td><span class="badge">{{ t.status or "Issued" }}</span></td>
+                <td>{{ t.prepared_by or "N/A" }}</td>
                 <td>{{ t.date_created }}</td>
+                <td>
+                    <a href="{{ url_for('print_transmittal', transmittal_id=t.id) }}" class="btn-small" target="_blank">
+                        Print
+                    </a>
+
+                    {% if session.get("role") == "admin" %}
+                    <form method="POST" action="{{ url_for('delete_transmittal', transmittal_id=t.id) }}" style="display:inline;">
+                        <button type="submit" class="btn-small" onclick="return confirm('Delete this transmittal?')">
+                            Delete
+                        </button>
+                    </form>
+                    {% endif %}
+                </td>
             </tr>
         {% else %}
             <tr>
-                <td colspan="4">No transmittal records.</td>
+                <td colspan="7">No transmittal records.</td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
 </section>
+
+<script>
+function addTransmittalRow() {
+    const tbody = document.querySelector("#transmittalItemsTable tbody");
+    const firstRow = tbody.querySelector("tr");
+    const newRow = firstRow.cloneNode(true);
+
+    newRow.querySelectorAll("input").forEach(input => {
+        if (input.type === "number") {
+            input.value = 1;
+        } else {
+            input.value = "";
+        }
+    });
+
+    newRow.querySelectorAll("select").forEach(select => {
+        select.selectedIndex = 0;
+    });
+
+    tbody.appendChild(newRow);
+}
+
+function removeTransmittalRow(button) {
+    const tbody = document.querySelector("#transmittalItemsTable tbody");
+
+    if (tbody.rows.length <= 1) {
+        alert("At least one item is required.");
+        return;
+    }
+
+    button.closest("tr").remove();
+}
+</script>
 
 {% endblock %}

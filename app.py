@@ -383,6 +383,62 @@ def init_db():
             )
         """)
 
+            # =============================
+    # TRANSMITTAL PRO TABLES
+    # =============================
+    if using_postgres():
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS transmittals (
+                id SERIAL PRIMARY KEY,
+                transmittal_no TEXT,
+                employee_id INTEGER,
+                employee_name TEXT,
+                purpose TEXT,
+                status TEXT DEFAULT 'Issued',
+                prepared_by TEXT,
+                date_created TEXT
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS transmittal_items (
+                id SERIAL PRIMARY KEY,
+                transmittal_id INTEGER REFERENCES transmittals(id),
+                item_id INTEGER REFERENCES items(id),
+                item_name TEXT,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                unit TEXT,
+                remarks TEXT
+            )
+        """)
+    else:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS transmittals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                transmittal_no TEXT,
+                employee_id INTEGER,
+                employee_name TEXT,
+                purpose TEXT,
+                status TEXT DEFAULT 'Issued',
+                prepared_by TEXT,
+                date_created TEXT
+            )
+        """)
+
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS transmittal_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                transmittal_id INTEGER,
+                item_id INTEGER,
+                item_name TEXT,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                unit TEXT,
+                remarks TEXT,
+                FOREIGN KEY (transmittal_id) REFERENCES transmittals(id),
+                FOREIGN KEY (item_id) REFERENCES items(id)
+            )
+        """)
+
     conn.commit()
     conn.close()
 
@@ -1970,31 +2026,166 @@ def transmittal():
     conn = get_db_connection()
 
     if request.method == "POST":
-        execute(conn, """
-            INSERT INTO transmittals
-            (transmittal_no, employee_name, purpose, date_created)
-            VALUES (?, ?, ?, ?)
-        """, (
-            request.form.get("transmittal_no"),
-            request.form.get("employee_name"),
-            request.form.get("purpose"),
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ))
+        transmittal_no = request.form.get("transmittal_no")
+        employee_id = request.form.get("employee_id") or None
+        purpose = request.form.get("purpose")
 
-        conn.commit()
-        conn.close()
+        employee_name = ""
+        if employee_id:
+            emp = fetchone(conn, "SELECT * FROM employees WHERE id = ?", (employee_id,))
+            if emp:
+                employee_name = emp["employee_name"]
 
-        flash("Transmittal created successfully.", "success")
+        try:
+            if using_postgres():
+                cur = execute(conn, """
+                    INSERT INTO transmittals
+                    (transmittal_no, employee_id, employee_name, purpose, status, prepared_by, date_created)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    RETURNING id
+                """, (
+                    transmittal_no,
+                    employee_id,
+                    employee_name,
+                    purpose,
+                    "Issued",
+                    session.get("full_name"),
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ))
+                transmittal_id = cur.fetchone()["id"]
+            else:
+                cur = execute(conn, """
+                    INSERT INTO transmittals
+                    (transmittal_no, employee_id, employee_name, purpose, status, prepared_by, date_created)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    transmittal_no,
+                    employee_id,
+                    employee_name,
+                    purpose,
+                    "Issued",
+                    session.get("full_name"),
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ))
+                transmittal_id = cur.lastrowid
+
+            item_ids = request.form.getlist("item_id[]")
+            quantities = request.form.getlist("quantity[]")
+            remarks_list = request.form.getlist("remarks[]")
+
+            for item_id, qty, remark in zip(item_ids, quantities, remarks_list):
+                if item_id:
+                    item = fetchone(conn, "SELECT * FROM items WHERE id = ?", (item_id,))
+                    if item:
+                        execute(conn, """
+                            INSERT INTO transmittal_items
+                            (transmittal_id, item_id, item_name, quantity, unit, remarks)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                        """, (
+                            transmittal_id,
+                            item_id,
+                            item["item_name"],
+                            int(qty or 1),
+                            item["unit"],
+                            remark
+                        ))
+
+            conn.commit()
+            flash("Transmittal created successfully.", "success")
+
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error creating transmittal: {e}", "danger")
+
+        finally:
+            conn.close()
+
         return redirect(url_for("transmittal"))
 
     transmittal_list = fetchall(conn, """
-        SELECT * FROM transmittals
+        SELECT *
+        FROM transmittals
         ORDER BY id DESC
+    """)
+
+    employees = fetchall(conn, """
+        SELECT *
+        FROM employees
+        ORDER BY employee_name ASC
+    """)
+
+    items = fetchall(conn, """
+        SELECT *
+        FROM items
+        ORDER BY item_name ASC
     """)
 
     conn.close()
 
-    return render_template("transmittal.html", transmittals=transmittal_list)
+    return render_template(
+        "transmittal.html",
+        transmittals=transmittal_list,
+        employees=employees,
+        items=items
+    )
+
+@app.route("/transmittal/print/<int:transmittal_id>")
+def print_transmittal(transmittal_id):
+    check = require_login()
+    if check:
+        return check
+
+    conn = get_db_connection()
+
+    transmittal = fetchone(conn, """
+        SELECT *
+        FROM transmittals
+        WHERE id = ?
+    """, (transmittal_id,))
+
+    items = fetchall(conn, """
+        SELECT *
+        FROM transmittal_items
+        WHERE transmittal_id = ?
+        ORDER BY id ASC
+    """, (transmittal_id,))
+
+    conn.close()
+
+    if not transmittal:
+        flash("Transmittal not found.", "danger")
+        return redirect(url_for("transmittal"))
+
+    return render_template(
+        "transmittal_print.html",
+        transmittal=transmittal,
+        items=items
+    )
+
+@app.route("/transmittal/delete/<int:transmittal_id>", methods=["POST"])
+def delete_transmittal(transmittal_id):
+    check = require_login()
+    if check:
+        return check
+
+    if session.get("role") != "admin":
+        flash("Admin access only.", "danger")
+        return redirect(url_for("transmittal"))
+
+    conn = get_db_connection()
+
+    try:
+        execute(conn, "DELETE FROM transmittal_items WHERE transmittal_id = ?", (transmittal_id,))
+        execute(conn, "DELETE FROM transmittals WHERE id = ?", (transmittal_id,))
+        conn.commit()
+        flash("Transmittal deleted successfully.", "success")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error deleting transmittal: {e}", "danger")
+    finally:
+        conn.close()
+
+    return redirect(url_for("transmittal"))
 
 
 @app.route("/health")

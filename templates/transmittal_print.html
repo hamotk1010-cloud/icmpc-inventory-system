@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Transmittal</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            color: #111827;
+            margin: 30px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 3px solid #123b7a;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+
+        .header img {
+            width: 70px;
+        }
+
+        .header h2 {
+            margin: 0;
+            color: #123b7a;
+        }
+
+        .header p {
+            margin: 3px 0;
+        }
+
+        .info {
+            margin-bottom: 20px;
+            line-height: 1.7;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th {
+            background: #123b7a;
+            color: white;
+            padding: 10px;
+            border: 1px solid #123b7a;
+        }
+
+        td {
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+        }
+
+        .signatures {
+            margin-top: 60px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 50px;
+        }
+
+        .sig-line {
+            border-top: 1px solid #111827;
+            text-align: center;
+            padding-top: 8px;
+        }
+
+        @media print {
+            button {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<button onclick="window.print()">Print</button>
+
+<div class="header">
+    <img src="{{ url_for('static', filename='images/logo.png') }}">
+    <div>
+        <h2>Iligan Cement Multi-Purpose Cooperative</h2>
+        <p><strong>Transmittal Form</strong></p>
+    </div>
+</div>
+
+<div class="info">
+    <p><strong>Transmittal No.:</strong> {{ transmittal.transmittal_no }}</p>
+    <p><strong>Date:</strong> {{ transmittal.date_created }}</p>
+    <p><strong>Employee / Recipient:</strong> {{ transmittal.employee_name }}</p>
+    <p><strong>Purpose:</strong> {{ transmittal.purpose or "N/A" }}</p>
+    <p><strong>Prepared By:</strong> {{ transmittal.prepared_by or "N/A" }}</p>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th>Item</th>
+            <th>Quantity</th>
+            <th>Unit</th>
+            <th>Remarks</th>
+        </tr>
+    </thead>
+
+    <tbody>
+    {% for item in items %}
+        <tr>
+            <td>{{ item.item_name }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>{{ item.unit or "" }}</td>
+            <td>{{ item.remarks or "" }}</td>
+        </tr>
+    {% else %}
+        <tr>
+            <td colspan="4">No items.</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<div class="signatures">
+    <div class="sig-line">
+        Released By
+    </div>
+
+    <div class="sig-line">
+        Received By
+    </div>
+</div>
+
+</body>
+</html>
