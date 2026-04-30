@@ -359,6 +359,30 @@ def init_db():
     except Exception:
         conn.rollback()
 
+    # =============================
+    # TRANSMITTAL TABLE
+    # =============================
+    if using_postgres():
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS transmittals (
+                id SERIAL PRIMARY KEY,
+                transmittal_no TEXT,
+                employee_name TEXT,
+                purpose TEXT,
+                date_created TEXT
+            )
+        """)
+    else:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS transmittals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                transmittal_no TEXT,
+                employee_name TEXT,
+                purpose TEXT,
+                date_created TEXT
+            )
+        """)
+
     conn.commit()
     conn.close()
 
@@ -618,10 +642,13 @@ def suppliers():
 
     conn = get_db_connection()
 
+    user_branch = session.get("branch")
+    username = session.get("username")
+
     if request.method == "POST":
         execute(conn, """
-            INSERT INTO suppliers 
-            (name, email, phone, address, tin, vat_type, business_type, contact_person, category, created_at)
+            INSERT INTO suppliers
+            (name, email, phone, address, tin, vat_type, business_type, category, contact_person, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             request.form.get("name"),
@@ -631,18 +658,27 @@ def suppliers():
             request.form.get("tin"),
             request.form.get("vat_type"),
             request.form.get("business_type"),
-            request.form.get("contact_person"),
             request.form.get("category"),
+            request.form.get("contact_person"),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
 
         conn.commit()
         conn.close()
-
-        flash("Supplier added successfully.", "success")
+        flash("Supplier added.", "success")
         return redirect(url_for("suppliers"))
 
-    supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
+    if username == "admin":
+        supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
+    else:
+        # NEW ADMIN = HIDE MAIN ADMIN DATA
+        supplier_list = fetchall(conn, """
+            SELECT * FROM suppliers
+            WHERE id NOT IN (
+                SELECT supplier_id FROM items WHERE branch != ?
+            )
+        """, (user_branch,))
+
     conn.close()
 
     return render_template("suppliers.html", suppliers=supplier_list)
@@ -656,9 +692,9 @@ def items():
 
     conn = get_db_connection()
 
-    # =============================
-    # ADD ITEM
-    # =============================
+    user_branch = session.get("branch")
+    username = session.get("username")
+
     if request.method == "POST":
         execute(conn, """
             INSERT INTO items
@@ -671,60 +707,38 @@ def items():
             int(request.form.get("quantity") or 0),
             int(request.form.get("low_stock_limit") or 5),
             request.form.get("supplier_id") or None,
-            request.form.get("branch") or session.get("branch"),
+            user_branch,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ))
+
         conn.commit()
         conn.close()
-
-        flash("Item added successfully.", "success")
+        flash("Item added.", "success")
         return redirect(url_for("items"))
 
-    # =============================
-    # FILTER LOGIC (FIXED)
-    # =============================
-    search = request.args.get("search", "")
-    category = request.args.get("category", "")
-
-    query = """
-        SELECT items.*, suppliers.name AS supplier_name
-        FROM items
-        LEFT JOIN suppliers ON suppliers.id = items.supplier_id
-        WHERE 1=1
-    """
-
-    params = []
-
-    # branch filter
-    role = session.get("role")
-    branch = session.get("branch")
-
-    if role == "branch_manager" and branch:
-        query += " AND items.branch = ?"
-        params.append(branch)
-
-    # search filter
-    if search:
-        query += " AND items.item_name LIKE ?"
-        params.append(f"%{search}%")
-
-    # category filter
-    if category:
-        query += " AND items.category = ?"
-        params.append(category)
-
-    query += " ORDER BY items.item_name ASC"
-
-    item_list = fetchall(conn, query, tuple(params))
+    # MAIN ADMIN = SEE ALL
+    if username == "admin":
+        item_list = fetchall(conn, """
+            SELECT items.*, suppliers.name AS supplier_name
+            FROM items
+            LEFT JOIN suppliers ON suppliers.id = items.supplier_id
+            ORDER BY items.item_name ASC
+        """)
+    else:
+        # OTHER ADMIN = ONLY THEIR BRANCH
+        item_list = fetchall(conn, """
+            SELECT items.*, suppliers.name AS supplier_name
+            FROM items
+            LEFT JOIN suppliers ON suppliers.id = items.supplier_id
+            WHERE items.branch = ?
+            ORDER BY items.item_name ASC
+        """, (user_branch,))
 
     supplier_list = fetchall(conn, "SELECT * FROM suppliers ORDER BY name ASC")
+
     conn.close()
 
-    return render_template(
-        "items.html",
-        items=item_list,
-        suppliers=supplier_list
-    )
+    return render_template("items.html", items=item_list, suppliers=supplier_list)
 
 # =============================
 # DELETE ITEM
@@ -1946,6 +1960,41 @@ def delete_employee(employee_id):
 
     flash("Employee deleted successfully.", "success")
     return redirect(url_for("employees"))
+
+@app.route("/transmittal", methods=["GET", "POST"])
+def transmittal():
+    check = require_login()
+    if check:
+        return check
+
+    conn = get_db_connection()
+
+    if request.method == "POST":
+        execute(conn, """
+            INSERT INTO transmittals
+            (transmittal_no, employee_name, purpose, date_created)
+            VALUES (?, ?, ?, ?)
+        """, (
+            request.form.get("transmittal_no"),
+            request.form.get("employee_name"),
+            request.form.get("purpose"),
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ))
+
+        conn.commit()
+        conn.close()
+
+        flash("Transmittal created successfully.", "success")
+        return redirect(url_for("transmittal"))
+
+    transmittal_list = fetchall(conn, """
+        SELECT * FROM transmittals
+        ORDER BY id DESC
+    """)
+
+    conn.close()
+
+    return render_template("transmittal.html", transmittals=transmittal_list)
 
 
 @app.route("/health")

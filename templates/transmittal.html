@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Transmittal</h1>
+
+<section class="panel">
+    <h2>Create Transmittal</h2>
+
+    <form method="POST" class="form-grid">
+        <input name="transmittal_no" placeholder="Transmittal No." required>
+
+        <input name="employee_name" placeholder="Employee Name" required>
+
+        <textarea name="purpose" placeholder="Purpose"></textarea>
+
+        <button type="submit">Create Transmittal</button>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Transmittal List</h2>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>No.</th>
+                <th>Employee</th>
+                <th>Purpose</th>
+                <th>Date</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for t in transmittals %}
+            <tr>
+                <td>{{ t.transmittal_no }}</td>
+                <td>{{ t.employee_name }}</td>
+                <td>{{ t.purpose }}</td>
+                <td>{{ t.date_created }}</td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4">No transmittal records.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% endblock %}
