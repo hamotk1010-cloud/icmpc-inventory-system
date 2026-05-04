@@ -2187,6 +2187,51 @@ def delete_transmittal(transmittal_id):
 
     return redirect(url_for("transmittal"))
 
+@app.route("/ffe-monitoring")
+def ffe_monitoring():
+    check = require_login()
+    if check:
+        return check
+
+    conn = get_db_connection()
+
+    search = request.args.get("search", "")
+    category = request.args.get("category", "")
+
+    query = """
+        SELECT items.*, suppliers.name AS supplier_name
+        FROM items
+        LEFT JOIN suppliers ON suppliers.id = items.supplier_id
+        WHERE items.category IN ('Furniture and Fixtures', 'Equipment')
+    """
+
+    params = []
+
+    if search:
+        query += """
+            AND (
+                items.item_name LIKE ?
+                OR items.branch LIKE ?
+                OR suppliers.name LIKE ?
+            )
+        """
+        params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+
+    if category:
+        query += " AND items.category = ?"
+        params.append(category)
+
+    query += " ORDER BY items.category ASC, items.item_name ASC"
+
+    ffe_items = fetchall(conn, query, tuple(params))
+    conn.close()
+
+    return render_template(
+        "ffe_monitoring.html",
+        ffe_items=ffe_items,
+        search=search,
+        category=category
+    )
 
 @app.route("/health")
 def health():

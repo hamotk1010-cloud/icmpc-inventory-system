@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h1>Furniture, Fixtures & Equipment Monitoring</h1>
+
+<section class="panel">
+    <h2>Filter Monitoring</h2>
+
+    <form method="GET" class="form-grid">
+        <input type="text" name="search" placeholder="Search item, branch, supplier..."
+               value="{{ search }}">
+
+        <select name="category">
+            <option value="">All FFE Categories</option>
+            <option value="Furniture and Fixtures" {% if category == "Furniture and Fixtures" %}selected{% endif %}>
+                Furniture and Fixtures
+            </option>
+            <option value="Equipment" {% if category == "Equipment" %}selected{% endif %}>
+                Equipment
+            </option>
+        </select>
+
+        <button type="submit">Filter</button>
+
+        <a href="{{ url_for('ffe_monitoring') }}" class="btn-link">Clear</a>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>FFE Inventory List</h2>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th>Unit</th>
+                <th>Qty</th>
+                <th>Low Stock Limit</th>
+                <th>Branch</th>
+                <th>Supplier</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody>
+        {% for item in ffe_items %}
+            <tr>
+                <td>{{ item.item_name }}</td>
+                <td>
+                    <span class="badge">{{ item.category }}</span>
+                </td>
+                <td>{{ item.unit or "N/A" }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.low_stock_limit }}</td>
+                <td>{{ item.branch or "N/A" }}</td>
+                <td>{{ item.supplier_name or "N/A" }}</td>
+                <td>
+                    {% if item.quantity <= item.low_stock_limit %}
+                        <span class="badge" style="background:#fee2e2; color:#991b1b;">Low Stock</span>
+                    {% else %}
+                        <span class="badge" style="background:#dcfce7; color:#166534;">Available</span>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="8">No furniture, fixtures, or equipment found.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+{% endblock %}
